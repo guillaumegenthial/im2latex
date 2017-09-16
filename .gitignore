@@ -1,0 +1,8 @@
+data/
+results/
+*.DS_Store
+*.pyc
+*.aux
+*.log
+*.gz
+*log.txt

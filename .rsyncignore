@@ -1,0 +1,8 @@
+*.DS_Store
+*.pyc
+data/
+scripts/
+third_party/
+src/results/
+*results*
+.git/
