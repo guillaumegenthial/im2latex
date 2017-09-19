@@ -1,6 +1,7 @@
-import numpy as np
-from PIL import Image
 import time
+import numpy as np
+from collections import Counter
+from PIL import Image
 
 
 UNK = "_UNK" # for unknown words
@@ -128,6 +129,56 @@ def load_tok_to_id(filename):
     tok_to_id[END] = len(tok_to_id)
 
     return tok_to_id
+
+
+def build_vocab(datasets, min_count=10):
+    """Build vocabulary from an iterable of datasets objects
+
+    Args:
+        datasets: a list of dataset objects
+        min_count: (int) if token appears less times, do not include it.
+
+    Returns:
+        a set of all the words in the dataset
+
+    """
+    print("Building vocab...")
+    c = Counter()
+    for dataset in datasets:
+        for _, formula in dataset:
+            try:
+                c.update(formula)
+            except Exception:
+                print(formula)
+                raise Exception
+    vocab = [tok for tok, count in c.items() if count >= min_count]
+    print("- done. {}/{} tokens added to vocab.".format(
+            len(vocab), len(c)))
+    return sorted(vocab)
+
+
+def write_vocab(vocab, filename):
+    """Writes a vocab to a file
+
+    Writes one word per line.
+
+    Args:
+        vocab: iterable that yields word
+        filename: path to vocab file
+
+    Returns:
+        write a word per line
+
+    """
+    print("Writing vocab...")
+    with open(filename, "w") as f:
+        for i, word in enumerate(vocab):
+            if i != len(vocab) - 1:
+                f.write("{}\n".format(word))
+            else:
+                f.write(word)
+    print("- done. {} tokens".format(i+1))
+
 
 
 def reconstruct_formula(tokens, rev_vocab):

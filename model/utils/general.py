@@ -5,6 +5,8 @@ import logging
 import sys
 import subprocess, shlex
 from threading import Timer
+from os import listdir
+from os.path import isfile, join
 
 
 def run(cmd, timeout_sec):
@@ -38,11 +40,15 @@ def init_dir(dir_name):
             os.makedirs(dir_name)
 
 
-
 def init_file(path_file, mode="a"):
     """Makes sure that a given file exists"""
     with open(path_file, mode) as f:
         pass
+
+
+def get_files(dir_name):
+    files = [f for f in listdir(dir_name) if isfile(join(dir_name, f))]
+    return files
 
 
 class Progbar(object):

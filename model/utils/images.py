@@ -3,32 +3,59 @@ import numpy as np
 import os
 import PIL
 from PIL import Image
-from .general import run
+from multiprocessing import Pool
+
+
+from .general import run, get_files
 
 
 TIMEOUT = 10
 
 
-def pad_image(img, output_path, pad_size=[8,8,8,8]):
-    """
-    Pads image with pad size
+def pad_image(img, output_path, pad_size=[8,8,8,8], buckets=None):
+    """Pads image with pad size and with buckets
 
     Args:
         img: (string) path to image
         output_path: (string) path to output image
+        pad_size: list of 4 ints
+        buckets: ascending ordered list of sizes, [(width, height), ...]
+
     """
-    PAD_TOP, PAD_LEFT, PAD_BOTTOM, PAD_RIGHT = pad_size
+    top, left, bottom, right = pad_size
     old_im = Image.open(img)
-    old_size = (old_im.size[0]+PAD_LEFT+PAD_RIGHT, old_im.size[1]+PAD_TOP+PAD_BOTTOM)
-    new_size = old_size
+    old_size = (old_im.size[0] + left + right, old_im.size[1] + top + bottom)
+    new_size = get_new_size(old_size, buckets)
     new_im = Image.new("RGB", new_size, (255,255,255))
-    new_im.paste(old_im, (PAD_LEFT,PAD_TOP))
+    new_im.paste(old_im, (left, top))
     new_im.save(output_path)
 
 
-def crop_image(img, output_path):
+def get_new_size(old_size, buckets):
+    """Computes new size from buckets
+
+    Args:
+        old_size: (width, height)
+        buckets: list of sizes
+
+    Returns:
+        new_size: original size or first bucket in iter order that matches the
+            size.
+
     """
-    Crops image to content
+    if buckets is None:
+        return old_size
+    else:
+        w, h = old_size
+        for (w_b, h_b) in buckets:
+            if w_b >= w and h_b >= h:
+                return w_b, h_b
+
+        return old_size
+
+
+def crop_image(img, output_path):
+    """Crops image to content
 
     Args:
         img: (string) path to image
@@ -51,9 +78,7 @@ def crop_image(img, output_path):
 
 
 def downsample_image(img, output_path, ratio=2):
-    """
-    Downsample image by ratio
-    """
+    """Downsample image by ratio"""
     assert ratio>=1, ratio
     if ratio == 1:
         return True
@@ -66,17 +91,20 @@ def downsample_image(img, output_path, ratio=2):
     return True
 
 
-def convert_to_png(formula, path_out, name, quality=100, density=200):
-    """
-    Convert latex to png image
+def convert_to_png(formula, dir_output, name, quality=100, density=200,
+        down_ratio=2, buckets=None):
+    """Converts LaTeX to png image
 
     Args:
         formula: (string) of latex
-        path_out: (string) path to output directory
+        dir_output: (string) path to output directory
         name: (string) name of file
+        down_ratio: (int) downsampling ratio
+        buckets: list of tuples (list of sizes) to produce similar shape images
+
     """
     # write formula into a .tex file
-    with open(path_out + "{}.tex".format(name), "w") as f:
+    with open(dir_output + "{}.tex".format(name), "w") as f:
         f.write(
     r"""\documentclass[preview]{standalone}
     \begin{document}
@@ -84,26 +112,61 @@ def convert_to_png(formula, path_out, name, quality=100, density=200):
     \end{document}""" % (formula))
 
     # call pdflatex to create pdf
-    run("pdflatex -interaction=nonstopmode -output-directory={} {}".format(path_out,
-        path_out+"{}.tex".format(name)), TIMEOUT)
+    run("pdflatex -interaction=nonstopmode -output-directory={} {}".format(
+        dir_output, dir_output+"{}.tex".format(name)), TIMEOUT)
 
     # call magick to convert the pdf into a png file
-    run("magick convert -density {} -quality {} {} {}".format(density, quality, path_out+"{}.pdf".format(name),
-        path_out+"{}.png".format(name)), TIMEOUT)
+    run("magick convert -density {} -quality {} {} {}".format(density, quality,
+        dir_output+"{}.pdf".format(name), dir_output+"{}.png".format(name)),
+        TIMEOUT)
 
     # cropping and downsampling
-    img_path = path_out + "{}.png".format(name)
-    crop_image(img_path, img_path)
-    pad_image(img_path, img_path)
-    downsample_image(img_path, img_path)
+    img_path = dir_output + "{}.png".format(name)
 
-    # cleaning
     try:
-        os.remove(path_out+"{}.aux".format(name))
-        os.remove(path_out+"{}.log".format(name))
-        os.remove(path_out+"{}.pdf".format(name))
-        os.remove(path_out+"{}.tex".format(name))
+        crop_image(img_path, img_path)
+        pad_image(img_path, img_path, buckets=buckets)
+        downsample_image(img_path, img_path, down_ratio)
+        clean(dir_output, name)
+
+        return "{}.png".format(name)
+
     except Exception, e:
         print(e)
+        clean(dir_output, name)
+        return False
 
-    return "{}.png".format(name)
+
+def clean(dir_output, name):
+    try:
+        os.remove(dir_output+"{}.aux".format(name))
+        os.remove(dir_output+"{}.log".format(name))
+        os.remove(dir_output+"{}.pdf".format(name))
+        os.remove(dir_output+"{}.tex".format(name))
+    except Exception:
+        pass
+
+
+def build_image(item):
+    idx, form, dir_images, quality, density, down_ratio, buckets = item
+    name = str(idx)
+    path_img = convert_to_png(form, dir_images, name, quality, density, down_ratio,
+            buckets)
+    return (path_img, idx)
+
+
+def build_images(formulas, dir_images, quality=100, density=200, down_ratio=2,
+        buckets=None, n_threads=4):
+    """Parallel procedure to produce images from formulas
+
+    If some of the images have already been produced, does not recompile them.
+    """
+    existing_idx = set([file_name.split('.')[0] for file_name in
+            get_files(dir_images) if file_name.split('.')[-1] == "png"])
+    pool   = Pool(n_threads)
+    result = pool.map(build_image, [(idx, form, dir_images, quality, density,
+            down_ratio, buckets) for idx, form in formulas.items()
+            if str(idx) not in existing_idx])
+    pool.close()
+    pool.join()
+    return result

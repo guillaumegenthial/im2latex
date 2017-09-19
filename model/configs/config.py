@@ -37,25 +37,32 @@ class Config():
 
     # directories
     dir_output = "results/full_eval_beam/"
-    dir_images = "data/images_processed"
     dir_plots  = dir_output + "plots/"
     dir_model  = dir_output + "model.weights/"
 
+    dir_images_train = "data/images_train/"
+    dir_images_test  = "data/images_test/"
+    dir_images_val   = "data/images_val/"
+
     # paths
-    path_vocab          = "data/latex_vocab.txt"
+    path_vocab          = "data/vocab.txt"
     path_log            = dir_output + "log.txt"
     path_results        = dir_output + "results_val.txt"
     path_results_final  = dir_output + "results.txt"
     path_results_img    = dir_output + "images/"
 
     # training data
-    path_matching_train = "data/train_filter.lst"
-    path_matching_val   = "data/val_filter.lst"
-    path_matching_test  = "data/test_filter.lst"
-    path_formulas       = "data/norm.formulas.lst"
+    path_matching_train = "data/train.matching.txt"
+    path_matching_val   = "data/val.matching.txt"
+    path_matching_test  = "data/test.matching.txt"
 
+    path_formulas_train = "data/train.formulas.norm.txt"
+    path_formulas_test  = "data/test.formulas.norm.txt"
+    path_formulas_val   = "data/val.formulas.norm.txt"
+
+    min_count_tok      = 10
     max_length_formula = 150
-    max_iter      = None
+    max_iter           = None
 
     # encoder
     encoder_dim = 256

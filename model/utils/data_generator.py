@@ -3,9 +3,11 @@ import os
 import numpy as np
 from scipy.misc import imread
 
+
 from .preprocess import greyscale, get_form_prepro
 from .data import minibatches, pad_batch_images, pad_batch_formulas, render
-from .images import convert_to_png
+from .images import build_images
+from .general import init_dir
 
 
 class DataGeneratorFile(object):
@@ -51,15 +53,20 @@ class DataGeneratorFile(object):
 class DataGenerator(object):
     """Data Generator of tuple (image, formula)"""
 
-    def __init__(self, path_formulas, dir_images, path_matching,
-                img_prepro=lambda x: x, form_prepro=lambda x: x, max_iter=None,
-                max_len=None, iter_mode="data", bucket=True, bucket_size=20,
-                single=True):
+    def __init__(self, path_formulas, dir_images, path_matching, bucket=False,
+                form_prepro=lambda s: s.strip().split(' '), iter_mode="data",
+                img_prepro=lambda x: x, max_iter=None, max_len=None,
+                bucket_size=20, single=True):
         """Initializes the DataGenerator
 
         Args:
-            path_formulas: (string) file of formulas, one formula per line
-            dir_images: (string) dir of images, contains jpg files
+            path_formulas: (string) file of formulas. There are 2 possible
+                settings:
+                    - single (one instance per example): one line, one formula
+                    - a few instances per example (for instance truth and some
+                        proposals): empty line = new example, new line = new
+                        instance
+            dir_images: (string) dir of images, contains jpg files.
             path_matching: (string) file of name_of_img, id_formula
             img_prepro: (lambda function) takes an array -> an array. Default,
                 identity
@@ -99,9 +106,7 @@ class DataGenerator(object):
                 self._single)
 
         if self._bucket:
-            gen = self.bucket(self._bucket_size)
-
-        return gen
+            self._data_generator = self.bucket(self._bucket_size)
 
 
     def bucket(self, bucket_size):
@@ -149,8 +154,17 @@ class DataGenerator(object):
     def _load_formulas(self, filename):
         """Loads txt file with formulas in a dict
 
+        In the multiple instance per example setting, between 2 example, there
+        is an id missing, that's how you know that the formulas belong to an
+        other example.
+
         Args:
-            filename: (string) path of formulas, one formula per line
+            filename: (string) path of formulas. There are 2 possible
+                settings:
+                    - single (one instance per example): one line, one formula
+                    - a few instances per example (for instance truth and some
+                        proposals): empty line = new example, new line = new
+                        instance
 
         Returns:
             dict: dict[idx] = one formula
@@ -160,7 +174,8 @@ class DataGenerator(object):
         with open(filename) as f:
             for idx, line in enumerate(f):
                 line = line.strip()
-                formulas[idx] = line
+                if len(line) != 0:
+                    formulas[idx] = line
 
         return formulas
 
@@ -242,32 +257,39 @@ class DataGenerator(object):
         return self._length
 
 
+    def build(self, single=True, quality=100, density=200, down_ratio=2,
+        buckets=None, n_threads=4):
+        """Generates images from the formulas and writes the correspondance
+        in the matching file.
 
-    def generate_from_formulas(self, single=True, quality=100, density=200):
+        Args:
+            single: if there is one instance per example (one formula only)
+            quality: parameter for magick
+            density: parameter for magick
+            down_ratio: (int) downsampling ratio
+            buckets: list of tuples (list of sizes) to produce similar shape images
+
         """
-        Generate images from the formulas and writes the correspondance in a
-        matchin file.
-        TODO: separate the rendering and the matching.
-        TODO: exploit parallelism to render the images.
-        """
-        if not os.path.exists(self._dir_images):
-            os.makedirs(self._dir_images)
+        # 1. produce images
+        init_dir(self._dir_images)
+        result = build_images(self._formulas, self._dir_images, quality,
+                density, down_ratio, buckets, n_threads)
 
-        with open(self._path_matching, "a") as f:
-            example = []
-            for idx, formula in self._formulas.iteritems():
+        # 2. write matching with same convention of naming
+        with open(self._path_matching, "w") as f:
+            if self._single:
+                for (path_img, idx) in result:
+                    if path_img is not False: # image was successfully produced
+                        f.write("{} {}\n".format(path_img, idx))
+            else:
+                last_idx, example_match = -1, []
+                for idx, formula in self._formulas.items():
+                    path_img = str(idx) + ".png"
 
-                # new example if 1. empty formula or 2. single mode
-                if (single or (not single and len(formula) == 0)) and len(example) > 0:
-                    f.write(" ".join(example) + "\n")
-                    example = []
+                    if idx - last_idx > 1 and len(example_match) > 0:
+                        f.write(" ".join(example_match) + "\n")
+                        example_match = [path_img, idx]
+                    else:
+                        example_match += [path_img, idx]
 
-                elif len(formula) > 0:
-                    try:
-                        img_path = convert_to_png(formula, self._dir_images,
-                                idx, quality, density)
-                        if img_path[-4:] == ".png":
-                            example.append("{} {}".format(img_path, idx))
-
-                    except Exception, e:
-                        print e
+                    last_idx = idx
