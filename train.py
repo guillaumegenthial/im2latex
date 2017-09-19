@@ -27,13 +27,12 @@ if __name__ == "__main__":
                         config.batch_size)
 
     lr_schedule = LRSchedule(lr_init=config.lr_init, lr_min=config.lr_min,
-                            start_decay=config.start_decay*n_batches_epoch,
-                            end_decay=config.end_decay*n_batches_epoch,
-                            lr_warm=config.lr_warm,
-                            end_warm=config.end_warm*n_batches_epoch)
+            start_decay=config.start_decay*n_batches_epoch,
+            end_decay=config.end_decay*n_batches_epoch,
+            lr_warm=config.lr_warm,
+            end_warm=config.end_warm*n_batches_epoch)
 
     # Build model
     model = Img2SeqModel(config)
     model.build()
-    model.restore_session(config.dir_model)
     model.train(train_set, val_set, lr_schedule)

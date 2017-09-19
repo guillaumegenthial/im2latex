@@ -180,6 +180,16 @@ def write_vocab(vocab, filename):
     print("- done. {} tokens".format(i+1))
 
 
+def load_formulas(filename):
+    formulas = dict()
+    with open(filename) as f:
+        for idx, line in enumerate(f):
+            line = line.strip()
+            if len(line) != 0:
+                formulas[idx] = line
+
+    return formulas
+
 
 def reconstruct_formula(tokens, rev_vocab):
     """

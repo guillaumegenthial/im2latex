@@ -157,6 +157,13 @@ def build_images(formulas, dir_images, quality=100, density=200, down_ratio=2,
     """Parallel procedure to produce images from formulas
 
     If some of the images have already been produced, does not recompile them.
+
+    Args:
+        formulas: (dict) idx -> string
+
+    Returns:
+        list of (path_img, idx). If an exception was raised during the image
+            generation, path_img = False
     """
     existing_idx = sorted(set([int(file_name.split('.')[0]) for file_name in
             get_files(dir_images) if file_name.split('.')[-1] == "png"]))

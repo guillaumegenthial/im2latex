@@ -5,7 +5,8 @@ from scipy.misc import imread
 
 
 from .preprocess import greyscale, get_form_prepro
-from .data import minibatches, pad_batch_images, pad_batch_formulas, render
+from .data import minibatches, pad_batch_images, pad_batch_formulas, render, \
+    load_formulas
 from .images import build_images
 from .general import init_dir
 
@@ -13,40 +14,24 @@ from .general import init_dir
 class DataGeneratorFile(object):
     """Simple Generator of tuples (img_path, formula_id)"""
 
-    def __init__(self, filename, single=True):
+    def __init__(self, filename):
         """Inits Data Generator File
 
         Iterator that returns
-            tuple (img_path, formula_id) if single
-            list of (tuples path), else
+            tuple (img_path, formula_id)
 
         Args:
-            filename: (string of path to file) where we have
-                multiple instances per example
-                    aqmsldfj.png 1 qmsdljfs.png 2
-                    qsfamsqsdf.png 4 qaezqd.png 5
-            single: if multiple instance, false
+            filename: (string of path to file)
 
         """
         self._filename = filename
-        self._single = single
 
     def __iter__(self):
-        """
-        Return type tuple or list of tuples if more than one instance
-        per example
-        """
         with open(self._filename) as f:
             for line in f:
                 line = line.strip().split(' ')
-                instances = []
-                for i in range(len(line)/2):
-                    instances.append((line[2*i], line[2*i+1]))
-
-                if self._single:
-                    yield instances[0]
-                else:
-                    yield instances
+                path_img, id_formula = line[0], line[1]
+                yield path_img, id_formula
 
 
 
@@ -56,16 +41,11 @@ class DataGenerator(object):
     def __init__(self, path_formulas, dir_images, path_matching, bucket=False,
                 form_prepro=lambda s: s.strip().split(' '), iter_mode="data",
                 img_prepro=lambda x: x, max_iter=None, max_len=None,
-                bucket_size=20, single=True):
+                bucket_size=20):
         """Initializes the DataGenerator
 
         Args:
-            path_formulas: (string) file of formulas. There are 2 possible
-                settings:
-                    - single (one instance per example): one line, one formula
-                    - a few instances per example (for instance truth and some
-                        proposals): empty line = new example, new line = new
-                        instance
+            path_formulas: (string) file of formulas.
             dir_images: (string) dir of images, contains jpg files.
             path_matching: (string) file of name_of_img, id_formula
             img_prepro: (lambda function) takes an array -> an array. Default,
@@ -79,7 +59,6 @@ class DataGenerator(object):
                 generator
             bucket: (bool) decides if bucket the data by size of image
             bucket_size: (int)
-            single: (bool) if each example contains multiple (images, formulas)
 
         """
         self._path_formulas  = path_formulas
@@ -92,7 +71,6 @@ class DataGenerator(object):
         self._iter_mode      = iter_mode
         self._bucket         = bucket
         self._bucket_size    = bucket_size
-        self._single         = single
 
         self._length         = None
         self._formulas       = self._load_formulas(path_formulas)
@@ -102,8 +80,7 @@ class DataGenerator(object):
 
     def _set_data_generator(self):
         """Sets iterable or generator of tuples (img_path, id of formula)"""
-        self._data_generator = DataGeneratorFile(self._path_matching,
-                self._single)
+        self._data_generator = DataGeneratorFile(self._path_matching)
 
         if self._bucket:
             self._data_generator = self.bucket(self._bucket_size)
@@ -154,28 +131,14 @@ class DataGenerator(object):
     def _load_formulas(self, filename):
         """Loads txt file with formulas in a dict
 
-        In the multiple instance per example setting, between 2 example, there
-        is an id missing, that's how you know that the formulas belong to an
-        other example.
-
         Args:
-            filename: (string) path of formulas. There are 2 possible
-                settings:
-                    - single (one instance per example): one line, one formula
-                    - a few instances per example (for instance truth and some
-                        proposals): empty line = new example, new line = new
-                        instance
+            filename: (string) path of formulas.
 
         Returns:
             dict: dict[idx] = one formula
 
         """
-        formulas = dict()
-        with open(filename) as f:
-            for idx, line in enumerate(f):
-                line = line.strip()
-                if len(line) != 0:
-                    formulas[idx] = line
+        formulas = load_formulas(filename)
 
         return formulas
 
@@ -220,27 +183,16 @@ class DataGenerator(object):
         """Iterator over Dataset
 
         Yields:
-            tuple (img, formula) if _single
-                img: array
-                formula: one formula
-            or list of those tuples else
+            tuple (img, formula)
 
         """
         n_iter = 0
         for example in self._data_generator:
             if self._max_iter is not None and n_iter >= self._max_iter:
                 break
-            # just one training instance per line
-            if type(example) is tuple:
-                result, skip = self._process_instance(example)
-                if skip: continue
-
-            # multiple instances of the same example per line
-            elif type(example) is list:
-                result, skip = zip(*[self._process_instance(inst) for inst
-                        in example])
-                if skip[0]: continue # filter on first example only
-
+            result, skip = self._process_instance(example)
+            if skip:
+                continue
             n_iter += 1
             yield result
 
@@ -257,13 +209,12 @@ class DataGenerator(object):
         return self._length
 
 
-    def build(self, single=True, quality=100, density=200, down_ratio=2,
-        buckets=None, n_threads=4):
+    def build(self, quality=100, density=200, down_ratio=2, buckets=None,
+                n_threads=4):
         """Generates images from the formulas and writes the correspondance
         in the matching file.
 
         Args:
-            single: if there is one instance per example (one formula only)
             quality: parameter for magick
             density: parameter for magick
             down_ratio: (int) downsampling ratio
@@ -277,19 +228,6 @@ class DataGenerator(object):
 
         # 2. write matching with same convention of naming
         with open(self._path_matching, "w") as f:
-            if self._single:
-                for (path_img, idx) in result:
-                    if path_img is not False: # image was successfully produced
-                        f.write("{} {}\n".format(path_img, idx))
-            else:
-                last_idx, example_match = -1, []
-                for idx, formula in self._formulas.items():
-                    path_img = str(idx) + ".png"
-
-                    if idx - last_idx > 1 and len(example_match) > 0:
-                        f.write(" ".join(example_match) + "\n")
-                        example_match = [path_img, idx]
-                    else:
-                        example_match += [path_img, idx]
-
-                    last_idx = idx
+            for (path_img, idx) in result:
+                if path_img is not False: # image was successfully produced
+                    f.write("{} {}\n".format(path_img, idx))

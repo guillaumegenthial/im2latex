@@ -4,6 +4,7 @@ from model.configs.config import Config
 from model.configs.small import Small
 from model.utils.images import build_images
 
+
 if __name__ == "__main__":
     config = Small(load=False)
 

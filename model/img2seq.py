@@ -6,7 +6,7 @@ import tensorflow.contrib.layers as layers
 
 from .utils.general import Progbar
 from .utils.data import minibatches, pad_batch_images, pad_batch_formulas
-from .utils.eval import write_answers, evaluate_text_metrics
+from .evaluation.text import write_answers, score_file
 
 
 from .encoder import Encoder
@@ -189,16 +189,14 @@ class Img2SeqModel(BaseModel):
             n_words += n_words_eval
             ce_words += ce_words_eval
             for form, pred in zip(formula, ids_eval):
-                # pred is of shape (number of hypotheses, time)
-                references.append([form])
+                references.append(form)
                 hypotheses.append(pred)
 
 
-        scores = evaluate_text_metrics(references, hypotheses,
+        write_answers(references, hypotheses,
                 self.config.id_to_tok, params["path_formulas_result"],
                 self.config.id_END)
-
-        ce_mean = ce_words / float(n_words)
-        scores["perplexity"] = - np.exp(ce_mean)
+        scores = score_file(params["path_formulas_result"])
+        scores["perplexity"] = - np.exp(ce_words / float(n_words))
 
         return scores

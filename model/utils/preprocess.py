@@ -1,6 +1,7 @@
 import numpy as np
-from data_utils import UNK
 
+
+from .data import UNK
 
 def greyscale(state):
     """

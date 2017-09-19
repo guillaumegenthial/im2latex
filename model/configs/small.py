@@ -20,7 +20,7 @@ class Small(Config):
     path_formulas_test  = "data/small.formulas.norm.txt"
     path_formulas_val   = "data/small.formulas.norm.txt"
 
-    n_epochs = 20
+    n_epochs = 2
     batch_size = 10
     max_iter = 10
     decoding = "beam_search"

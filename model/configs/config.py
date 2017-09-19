@@ -9,19 +9,15 @@ from ..utils.general import get_logger, init_dir, init_file
 class Config():
 
     def __init__(self, load=True):
-        """Creates output directories if they don't exist and load vocabulary
-
-        Defines attributes that depends on the vocab.
-        Look for the __init__ comments in the class attributes
-        """
+        """Creates output directories if they don't exist and load vocabulary"""
         # result directories
         dir_output      = self.dir_output
         self.dir_plots  = dir_output + "plots/"
         self.dir_model  = dir_output + "model.weights/"
+        self.dir_images_test_result = dir_output + "images_test_result/"
 
         # result paths
         self.path_log                  = dir_output + "config.log"
-        self.path_results_img          = dir_output + "images/"
         self.path_formulas_val_result  = dir_output + "val.formulas.result.txt"
         self.path_formulas_test_result = dir_output + "test.formulas.result.txt"
 
