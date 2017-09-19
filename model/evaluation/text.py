@@ -18,7 +18,40 @@ NOTE: The file containing the answer has to follow the following format
     truth2      (example 2)
     pred2.1
     ...
+
+
+The pipeline for the evaluation is the following
+    - model produces this file (with write_answers) or file is produced by
+        some other method
+    - load the formulas with id = number of line. If 2 consecutive
+        formulas don't have consecutive ids, new example
+    - iterate over the formulas, the ids giving us the information that we have
+        different examples. Uses examples generator defined below for more
+        abstraction.
+
 """
+
+def examples(formulas):
+    """Generator of example from formulas
+
+    Args:
+        formulas: (dict) idx -> string. If 2 consecutive
+            formulas don't have consecutive ids, new example
+
+    Yields:
+        list of tuples (id formula, formula)
+
+    """
+    last_idx, ex = -1, []
+    formulas_ordered = sorted(formulas.items(), key=lambda t: t[0])
+    for idx, form in formulas_ordered:
+        if idx - last_idx > 1: # new example
+            if len(ex) > 1:
+                yield ex
+            ex = []
+
+        ex.append((idx, form))
+        last_idx = idx
 
 
 def truncate_end(list_of_ids, id_END):
@@ -74,21 +107,17 @@ def unzip_formulas(formulas):
             consecutive ids, new example
 
     Returns:
-        reference: list of list          (one reference)
-        hypotheses: list of list of list (multiple hypothesis)
+        references: list of formulas  (one reference)
+        hypotheses: list of list of formulas  (multiple hypothesis)
 
     """
     last_idx = -1
-    references, hypotheses, ex = [], [], []
-    for idx, form in formulas.items():
-        if idx - last_idx > 1: # new example
-            if len(ex) > 1:
-                references.append(ex[0])
-                hypotheses.append(ex[1:])
-            ex = []
-
-        ex.append(form.split(' '))
-        last_idx = idx
+    references, hypotheses = [], []
+    for ex in examples(formulas):
+        ref_id, ref_form = ex[0]
+        hypo_ids, hypo_forms = zip(*ex[1:])
+        references.append(ref_form)
+        hypotheses.append(hypo_forms)
 
     return references, hypotheses
 
@@ -103,11 +132,15 @@ def score_file(path):
         scores: (dict)
 
     """
-    formulas = load_formulas(path)
+    # load formulas
+    formulas               = load_formulas(path)
     references, hypotheses = unzip_formulas(formulas)
 
-    # only take the first hypo for each example (best one)
-    best_hypotheses = [hypos[0] for hypos in hypotheses]
+    # tokenize and extract best hypo
+    references = [ref.split(' ') for ref in references]
+    best_hypotheses = [hypos[0].split(' ') for hypos in hypotheses]
+
+    # score
     scores           = dict()
     scores["BLEU-4"] = bleu_score(references, best_hypotheses)
     scores["EM"]     = exact_match_score(references, best_hypotheses)
@@ -170,4 +203,4 @@ def edit_distance(references, hypotheses):
         d_leven += distance.levenshtein(ref, hypo)
         len_tot += float(max(len(ref), len(hypo)))
 
-    return 1 - d_leven / len_tot
+    return 1. - d_leven / len_tot

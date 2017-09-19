@@ -204,7 +204,7 @@ class BaseModel(object):
             params: (dict) with extra params in it
 
         Return:
-            metrics: (dict) metrics["acc"] = 0.85 for instance
+            scores: (dict) scores["acc"] = 0.85 for instance
 
         """
         # logging
@@ -212,16 +212,16 @@ class BaseModel(object):
         sys.stdout.flush()
 
         # evaluate
-        metrics = self._run_evaluate(test_set, params)
+        scores = self._run_evaluate(test_set, params)
 
         # logging
         sys.stdout.write("\r")
         sys.stdout.flush()
         msg = " - ".join(["{} {:04.2f}".format(k, v)
-                for k, v in metrics.items()])
+                for k, v in scores.items()])
         self.logger.info("- Eval: {}".format(msg))
 
-        return metrics
+        return scores
 
 
     def _run_evaluate(test_set, params):
@@ -234,7 +234,7 @@ class BaseModel(object):
             params: (dict) with extra params in it
 
         Returns:
-            metrics: (dict) metrics["acc"] = 0.85 for instance
+            scores: (dict) scores["acc"] = 0.85 for instance
 
         """
         raise NotImplementedError

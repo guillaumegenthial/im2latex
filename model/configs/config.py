@@ -23,8 +23,9 @@ class Config():
 
         # directory for training outputs
         init_dir(self.dir_output)
-        init_dir(self.dir_model)
         init_dir(self.dir_plots)
+        init_dir(self.dir_model)
+        init_dir(self.dir_images_test_result)
 
         # initializer file for answers
         init_file(self.path_formulas_test_result)
