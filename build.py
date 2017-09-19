@@ -1,10 +1,11 @@
 from model.utils.data_generator import DataGenerator
 from model.utils.data import build_vocab, write_vocab
 from model.configs.config import Config
+from model.configs.small import Small
 from model.utils.images import build_images
 
 if __name__ == "__main__":
-    config = Config()
+    config = Small(load=False)
 
     # datasets
     train_set = DataGenerator(
@@ -28,6 +29,8 @@ if __name__ == "__main__":
         (1000, 400), (1200, 200), (1600, 200), (1600, 1600)
         ]
 
+    train_set.build(buckets=buckets)
+    test_set.build(buckets=buckets)
     val_set.build(buckets=buckets)
 
     # vocab

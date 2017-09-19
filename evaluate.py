@@ -1,32 +1,23 @@
-from utils.dataset import Dataset
-from models.model import Model
-from configs.config import Config, Test
-from utils.preprocess import greyscale, get_form_prepro, compose
-from utils.data_utils import minibatches, pad_batch_formulas, \
-    pad_batch_images
-from utils.lr_schedule import LRSchedule
-import tensorflow as tf
-from utils.evaluate import evaluate_dataset
+from model.utils.data_generator import DataGenerator
+from model.img2seq import Img2SeqModel
+from model.configs.config import Config
+from model.configs.small import Small
+from model.utils.preprocess import greyscale, get_form_prepro
 
 
 if __name__ == "__main__":
-    # Load config
-    config = Config()
-
-    path_formulas = config.path_results_final
-    path_matching_eval = config.dir_output + "matching.txt"
-    dir_images = config.dir_output + "images/"
-
-    # get dataset from the formulas outputed by our model
-    test_set  =  Dataset(path_formulas=path_formulas, dir_images=dir_images,
-                    path_matching=path_matching_eval, img_prepro=greyscale, 
-                    form_prepro=get_form_prepro(config.vocab), max_len=config.max_length_formula,
-                    max_iter=config.max_iter, bucket=False, single=False)
-
-    # generate the images and the matching from the formulas
-    # test_set.generate_from_formulas(single=False)
+    # restore model
+    config = Small()
+    model = Img2SeqModel(config)
+    model.build()
+    model.restore_session(config.dir_model)
 
     # evaluate
-    scores = evaluate_dataset(test_set, config.dir_plots)
-    scores_to_print = " - ".join(["{}: {:04.2f}".format(name, value) for name, value in scores.iteritems()])
-    config.logger.info(scores_to_print)
+    test_set = DataGenerator(path_formulas=config.path_formulas_test,
+            dir_images=config.dir_images_test, max_iter=config.max_iter,
+            path_matching=config.path_matching_test, img_prepro=greyscale,
+            form_prepro=get_form_prepro(config.tok_to_id),
+            max_len=config.max_length_formula)
+
+    model.evaluate(test_set,
+            params={"path_formulas_result": config.path_formulas_test_result})

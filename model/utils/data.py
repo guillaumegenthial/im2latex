@@ -123,7 +123,7 @@ def load_tok_to_id(filename):
             token = token.strip()
             tok_to_id[token] = idx
 
-    # add pad and unk tokens
+    # add pad, unk and end tokens
     tok_to_id[PAD] = len(tok_to_id)
     tok_to_id[UNK] = len(tok_to_id)
     tok_to_id[END] = len(tok_to_id)

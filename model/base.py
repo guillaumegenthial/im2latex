@@ -76,11 +76,9 @@ class BaseModel(object):
 
     def init_session(self):
         """Defines self.sess, self.saver and initialize the variables"""
-        self.logger.info("Initializing tf session")
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
-        self.logger.info("- done.")
 
 
     def restore_session(self, dir_model):
@@ -147,28 +145,32 @@ class BaseModel(object):
             best_score: (float)
 
         """
-        tic = time.time()
         best_score = None
         self._add_summary() # tensorboard
 
         for epoch in range(self.config.n_epochs):
+            # logging
+            tic = time.time()
             self.logger.info("Epoch {:}/{:}".format(epoch+1,
                     self.config.n_epochs))
+
+            # epoch
             score = self._run_epoch(train_set, val_set, epoch, lr_schedule)
 
             # save weights if we have new best score on eval
             if best_score is None or score >= best_score:
                 best_score = score
-                self.logger.info("- New best score ({})!".format(best_score))
+                self.logger.info("- New best score ({:04.2f})!".format(
+                        best_score))
                 self.save_session()
             if lr_schedule.stop_training:
                 self.logger.info("- Early Stopping.")
                 break
 
-        # logging
-        toc = time.time()
-        self.logger.info("- Elapsed time: {:04.2f}, lr: {:04.5f}".format(
-                        toc-tic, lr_schedule.lr))
+            # logging
+            toc = time.time()
+            self.logger.info("- Elapsed time: {:04.2f}, lr: {:04.5f}".format(
+                            toc-tic, lr_schedule.lr))
 
         return best_score
 
@@ -192,13 +194,14 @@ class BaseModel(object):
         raise NotImplementedError
 
 
-    def evaluate(self, test_set):
+    def evaluate(self, test_set, params=None):
         """Evaluates model on test set
 
         Calls method run_evaluate on test_set and takes care of logging
 
         Args:
             test_set: instance of class Dataset
+            params: (dict) with extra params in it
 
         Return:
             metrics: (dict) metrics["acc"] = 0.85 for instance
@@ -209,7 +212,7 @@ class BaseModel(object):
         sys.stdout.flush()
 
         # evaluate
-        metrics = self._run_evaluate(test_set)
+        metrics = self._run_evaluate(test_set, params)
 
         # logging
         sys.stdout.write("\r")
@@ -221,13 +224,14 @@ class BaseModel(object):
         return metrics
 
 
-    def _run_evaluate(test_set):
+    def _run_evaluate(test_set, params):
         """Model-specific method to overwrite
 
         Performs an epoch of evaluation
 
         Args:
             test_set: Dataset instance
+            params: (dict) with extra params in it
 
         Returns:
             metrics: (dict) metrics["acc"] = 0.85 for instance

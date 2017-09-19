@@ -9,38 +9,45 @@ matplotlib.use('Agg')
 import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 
+
 from .images import convert_to_png
+
 
 TIMEOUT = 10
 
 
-def evaluate(references, hypotheses, rev_vocab, path, id_END):
-    """
-    Evaluate BLEU and EM scores from txt hypotheses and references
-    Write answers in a text file
+def evaluate_text_metrics(references, hypotheses, rev_vocab, path, id_END):
+    """Evaluates BLEU and EM scores from txt hypotheses and references and
+    writes answers in a txt file
 
     Args:
         references: list of lists of list (multiple references per hypothesis)
         hypotheses: list of list of list (multiple hypotheses)
         rev_vocab: (dict) rev_vocab[idx] = word
         path: (string) path where to write results
+        id_END: (int) special id of token that corresponds to the END of
+            sentence
+
+    Returns:
+        scores: (dict)
+
     """
+    # write answers
     hypotheses = truncate_end(hypotheses, id_END)
     write_answers(references, hypotheses, rev_vocab, path)
-    scores = dict()
-    
+
     # extract best hypothesis to compute scores
-    hypotheses = [hypos[0] for hypos in hypotheses]
+    scores           = dict()
+    hypotheses       = [hypos[0] for hypos in hypotheses]
     scores["BLEU-4"] = bleu_score(references, hypotheses)
-    scores["EM"] = exact_match_score(references, hypotheses)
+    scores["EM"]     = exact_match_score(references, hypotheses)
+    scores["Lev"]    = edit_distance(references, hypotheses)
+
     return scores
-    
+
 
 def truncate_end(hypotheses, id_END):
-    """
-    Dummy code to remove the end of each sentence starting from
-    the first id_END token.
-    """
+    """Removes the end of each sentence starting from the first id_END token"""
     trunc_hypotheses = []
     for hypos in hypotheses:
         trunc_hypos = []
@@ -59,16 +66,27 @@ def truncate_end(hypotheses, id_END):
 
 
 def write_answers(references, hypotheses, rev_vocab, path):
-    """ 
-    Write text answers in file, the format is
-        truth
-        prediction
-        new line
+    """Writes text answers in file
+
+    The format is:
+        truth1      (example 1)
+        pred1.1
+        pred1.2
+                    (new line = new example)
+        truth2      (example 2)
+        pred2.1
         ...
+
+    Args:
+        references: list of lists of list (multiple references per hypothesis)
+        hypotheses: list of list of list (multiple hypotheses)
+        rev_vocab: (dict) rev_vocab[idx] = word
+        path: (string) path where to write results
+
     """
     assert len(references) == len(hypotheses)
 
-    with open(path, "a") as f:
+    with open(path, "w") as f:
         for refs, hypos in zip(references, hypotheses):
             ref = refs[0] # only take first ref
             ref = [rev_vocab[idx] for idx in ref]
@@ -84,15 +102,15 @@ def write_answers(references, hypotheses, rev_vocab, path):
 
 
 def exact_match_score(references, hypotheses):
-    """
-    Compute exact match scores.
+    """Computes exact match scores.
 
     Args:
-        references: list of list of list of ids of tokens
-            (assumes multiple references per exemple). In
-            our case we only consider the first reference.
+        references: list of list of list of ids of tokens (multiple refs)
+        hypotheses: list of list of ids of tokens (one hypothesis)
 
-        hypotheses: list of list of ids of tokens
+    Returns:
+        exact_match: (float)
+
     """
     exact_match = 0
     for refs, hypo in zip(references, hypotheses):
@@ -104,45 +122,53 @@ def exact_match_score(references, hypotheses):
 
 
 def bleu_score(references, hypotheses):
-    """
-    Computes bleu score. BLEU-4 has been shown to be the most 
-    correlated with human judgement so we use this one.
+    """Computes bleu score.
+
+    BLEU-4 has been shown to be the most correlated with human judgement so we
+    use this one.
+
+    Args:
+        references: list of lists of list (multiple references per hypothesis)
+        hypotheses: list of list of list (multiple hypotheses)
+
     """
     BLEU_4 = nltk.translate.bleu_score.corpus_bleu(references, hypotheses,
         weights=(0.25, 0.25, 0.25, 0.25))
     return BLEU_4
 
 
-
-def edit_distance(ref, hypo):
-    """
-    Computes Levenshtein distance between two sequences.
+def edit_distance(references, hypotheses):
+    """Computes Levenshtein distance between two sequences.
 
     Args:
-        ref, hypo: two lists of tokens
+        references: list of lists of list (multiple references per hypothesis)
+        hypotheses: list of list (one hypothesis)
 
     Returns:
         levenshtein distance
         max length of the two sequences
     """
-    d_leven = distance.levenshtein(ref, hypo)
-    max_len = float(max(len(ref), len(hypo)))
+    d_leven, len_tot = 0, 0
+    for refs, hypo in zip(references, hypotheses):
+        ref = refs[0] # only take first reference
+        d_leven += distance.levenshtein(ref, hypo)
+        len_tot += float(max(len(ref), len(hypo)))
 
-    return d_leven, max_len
+    return d_leven / len_tot
 
 
 def img_edit_distance(img1, img2):
-    """
-    Computes Levenshtein distance between two images.
-    Slice the images into columns and consider one column as a character.
+    """Computes Levenshtein distance between two images.
 
-    Code strongly inspired by Harvard's evaluation scripts.
+    Slices the images into columns and consider one column as a character.
+
     Args:
         im1, im2: np arrays of shape (H, W, 1)
 
     Returns:
         column wise levenshtein distance
         max length of the two sequences
+
     """
     # load the image (H, W)
     img1, img2 = img1[:, :, 0], img2[:, :, 0]
@@ -177,8 +203,7 @@ def img_edit_distance(img1, img2):
 
 
 def evaluate_dataset(test_set, dir_plots, prefix=""):
-    """
-    Render latex formulas into png of reference and hypothesis
+    """Render latex formulas into png of reference and hypothesis
 
     Args:
         test_set: iterable that yields
@@ -241,7 +266,7 @@ def evaluate_dataset(test_set, dir_plots, prefix=""):
         hypos = example[1:]
         img_ref, formula_ref = ref
         hypo_best = None
-        
+
 
         # fake hypothesis if we don't have one (failed to compile image)
         if len(hypos) == 0:
@@ -255,7 +280,7 @@ def evaluate_dataset(test_set, dir_plots, prefix=""):
             # the first hypothesis is the one our system would propose
             if idx == 0:
                 hypo_best = {"edit_img": edit_img, "edit_txt": edit_txt,
-                             "len_img": len_img, "len_txt": len_txt, 
+                             "len_img": len_img, "len_txt": len_txt,
                              "id": idx + 1, "formula": formula_hypo}
 
                 references.append([formula_ref])
@@ -271,7 +296,7 @@ def evaluate_dataset(test_set, dir_plots, prefix=""):
         # record the best hypothesis
         _update_results(results_best, hypo_best)
         hypotheses_best.append(hypo_best["formula"])
-            
+
     # generate final scores
     scores = dict()
 
@@ -290,10 +315,10 @@ def evaluate_dataset(test_set, dir_plots, prefix=""):
     scores["BLEU Best"]      = bleu_score(references, hypotheses_best)
 
     # plot distributions
-    plot_histograms(x0=results["distrib_edit_txt"], x1=results["distrib_edit_img"], 
+    plot_histograms(x0=results["distrib_edit_txt"], x1=results["distrib_edit_img"],
                     fname=dir_plots + str(prefix) + "_edit_hist")
 
-    plot_histograms(x0=results_best["distrib_edit_txt"], x1=results_best["distrib_edit_img"], 
+    plot_histograms(x0=results_best["distrib_edit_txt"], x1=results_best["distrib_edit_img"],
                     fname=dir_plots + str(prefix) + "_edit_hist_best")
 
     plot_histogram(x=results_best["distrib_ids"], fname=dir_plots + str(prefix) + "_ids")

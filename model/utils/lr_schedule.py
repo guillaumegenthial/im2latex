@@ -48,12 +48,6 @@ class LRSchedule(object):
         self._early_stopping   = early_stopping
         self._n_batch_no_imprv = 0
 
-
-        # setup of exponential decay
-        if self._end_decay is not None:
-            self._exp_decay = np.power(lr_min/lr_init,
-                                       1/float(end_decay - start_decay))
-
         # warm start initializes learning rate to warm start
         if self._end_warm is not None:
             # make sure that decay happens after the warm up
@@ -61,6 +55,11 @@ class LRSchedule(object):
             self.lr = self._lr_warm
         else:
             self.lr = lr_init
+
+        # setup of exponential decay
+        if self._end_decay is not None:
+            self._exp_decay = np.power(lr_min/lr_init,
+                    1/float(self._end_decay - self._start_decay))
 
 
     @property

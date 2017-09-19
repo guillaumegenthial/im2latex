@@ -6,7 +6,7 @@ import tensorflow.contrib.layers as layers
 
 from .utils.general import Progbar
 from .utils.data import minibatches, pad_batch_images, pad_batch_formulas
-from .utils.eval import write_answers, evaluate
+from .utils.eval import write_answers, evaluate_text_metrics
 
 
 from .encoder import Encoder
@@ -150,22 +150,24 @@ class Img2SeqModel(BaseModel):
 
 
         # evaluation
-        metrics = self.evaluate(val_set)
-        score = metrics[self.config.metric_val] # selection
-
-        lr_schedule.update(score=score) # for early stopping
+        scores = self.evaluate(val_set,
+                {"path_formulas_result": self.config.path_formulas_val_result})
+        score = scores[self.config.metric_val]
+        lr_schedule.update(score=score)
 
         return score
 
 
-    def _run_evaluate(self, test_set):
+    def _run_evaluate(self, test_set, params):
         """Performs an epoch of evaluation
 
         Args:
             test_set: Dataset instance
+            params: (dict) with extra params in it
+                - "path_formulas_result": (string)
 
         Returns:
-            metrics: (dict) metrics["acc"] = 0.85 for instance
+            scores: (dict) scores["acc"] = 0.85 for instance
 
         """
         references, hypotheses = [], []
@@ -192,8 +194,9 @@ class Img2SeqModel(BaseModel):
                 hypotheses.append(pred)
 
 
-        scores = evaluate(references, hypotheses, self.config.id_to_tok,
-                self.config.path_results, self.config.id_END)
+        scores = evaluate_text_metrics(references, hypotheses,
+                self.config.id_to_tok, params["path_formulas_result"],
+                self.config.id_END)
 
         ce_mean = ce_words / float(n_words)
         scores["perplexity"] = - np.exp(ce_mean)

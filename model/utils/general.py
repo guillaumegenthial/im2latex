@@ -51,6 +51,13 @@ def get_files(dir_name):
     return files
 
 
+def delete_file(path_file):
+    try:
+        os.remove(path_file)
+    except Exception:
+        pass
+
+
 class Progbar(object):
     """Progbar class copied from keras (https://github.com/fchollet/keras/)
 

@@ -6,7 +6,7 @@ from PIL import Image
 from multiprocessing import Pool
 
 
-from .general import run, get_files
+from .general import run, get_files, delete_file
 
 
 TIMEOUT = 10
@@ -138,13 +138,10 @@ def convert_to_png(formula, dir_output, name, quality=100, density=200,
 
 
 def clean(dir_output, name):
-    try:
-        os.remove(dir_output+"{}.aux".format(name))
-        os.remove(dir_output+"{}.log".format(name))
-        os.remove(dir_output+"{}.pdf".format(name))
-        os.remove(dir_output+"{}.tex".format(name))
-    except Exception:
-        pass
+    delete_file(dir_output+"{}.aux".format(name))
+    delete_file(dir_output+"{}.log".format(name))
+    delete_file(dir_output+"{}.pdf".format(name))
+    delete_file(dir_output+"{}.tex".format(name))
 
 
 def build_image(item):
@@ -161,12 +158,16 @@ def build_images(formulas, dir_images, quality=100, density=200, down_ratio=2,
 
     If some of the images have already been produced, does not recompile them.
     """
-    existing_idx = set([file_name.split('.')[0] for file_name in
-            get_files(dir_images) if file_name.split('.')[-1] == "png"])
+    existing_idx = sorted(set([int(file_name.split('.')[0]) for file_name in
+            get_files(dir_images) if file_name.split('.')[-1] == "png"]))
+
     pool   = Pool(n_threads)
     result = pool.map(build_image, [(idx, form, dir_images, quality, density,
             down_ratio, buckets) for idx, form in formulas.items()
-            if str(idx) not in existing_idx])
+            if idx not in existing_idx])
     pool.close()
     pool.join()
+
+    result += [(str(idx) + ".png", idx) for idx in existing_idx]
+
     return result
