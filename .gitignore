@@ -5,4 +5,5 @@ results/
 *.aux
 *.log
 *.gz
-*log.txt
+*.log
+*.sh

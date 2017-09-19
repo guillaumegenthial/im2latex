@@ -1,1 +1,0 @@
-rsync -rtv --exclude-from='.rsyncignore' . genthial@icme-gpu.stanford.edu:~/img2latex/

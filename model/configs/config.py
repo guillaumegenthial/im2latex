@@ -20,7 +20,7 @@ class Config():
         self.dir_model  = dir_output + "model.weights/"
 
         # result paths
-        self.path_log                  = dir_output + "log.txt"
+        self.path_log                  = dir_output + "config.log"
         self.path_results_img          = dir_output + "images/"
         self.path_formulas_val_result  = dir_output + "val.formulas.result.txt"
         self.path_formulas_test_result = dir_output + "test.formulas.result.txt"
