@@ -1,6 +1,5 @@
 numpy
 scipy
 tensorflow
-tensorflow-gpu
 nltk
 distance

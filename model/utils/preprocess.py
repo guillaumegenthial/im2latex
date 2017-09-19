@@ -7,7 +7,7 @@ def greyscale(state):
     Preprocess state (:, :, 3) image into
     """
     # grey scale
-    state = state[:, :, 0] * 0.299 + state[:, :, 1] * 0.587 + state[:, :, 2] * 0.114
+    state = state[:, :, 0]*0.299 + state[:, :, 1]*0.587 + state[:, :, 2]*0.114
     state = state[:, :, np.newaxis]
     return state.astype(np.uint8)
 

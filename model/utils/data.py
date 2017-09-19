@@ -123,11 +123,11 @@ def load_tok_to_id(filename):
             tok_to_id[token] = idx
 
     # add pad and unk tokens
-    tok_to_id[PAD] = tok_to_id(vocab)
-    tok_to_id[UNK] = tok_to_id(vocab)
-    tok_to_id[END] = tok_to_id(vocab)
+    tok_to_id[PAD] = len(tok_to_id)
+    tok_to_id[UNK] = len(tok_to_id)
+    tok_to_id[END] = len(tok_to_id)
 
-    return vocab
+    return tok_to_id
 
 
 def reconstruct_formula(tokens, rev_vocab):

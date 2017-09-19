@@ -1,13 +1,11 @@
 import sys
 import numpy as np
-import time
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
 
 from .utils.general import Progbar
-from .utils.data import minibatches, pad_batch_images, \
-    pad_batch_formulas, load_vocab
+from .utils.data import minibatches, pad_batch_images, pad_batch_formulas
 from .utils.eval import write_answers, evaluate
 
 
@@ -30,7 +28,7 @@ class Img2SeqModel(BaseModel):
         self._add_pred_op()
         self._add_loss_op()
 
-        self._build()
+        self._build() # train op and init session
 
         self.logger.info("- done.")
 
@@ -56,7 +54,7 @@ class Img2SeqModel(BaseModel):
         self.formula_length = tf.placeholder(tf.int32, shape=(None, ),
             name='formula_length')
 
-        # for tensorboard
+        # tensorboard
         tf.summary.scalar("lr", self.lr)
 
 
@@ -112,12 +110,13 @@ class Img2SeqModel(BaseModel):
 
 
 
-    def _run_epoch(self, train_set, val_set, lr_schedule):
+    def _run_epoch(self, train_set, val_set, epoch, lr_schedule):
         """Performs an epoch of training
 
         Args:
             train_set: Dataset instance
             val_set: Dataset instance
+            epoch: (int) id of the epoch, starting at 0
             lr_schedule: LRSchedule instance that takes care of learning proc
 
         Returns:
@@ -126,7 +125,6 @@ class Img2SeqModel(BaseModel):
 
         """
         # logging
-        tic = time.time()
         batch_size = self.config.batch_size
         nbatches = (len(train_set) + batch_size - 1) // batch_size
         prog = Progbar(target=nbatches)
@@ -150,10 +148,7 @@ class Img2SeqModel(BaseModel):
             # update learning rate
             lr_schedule.update(batch_no=epoch*nbatches + i)
 
-        # logging
-        toc = time.time()
-        self.logger.info("- Epoch {} - time: {:04.2f}, lr: {:04.5f}".format(
-                        epoch, toc-tic, lr_schedule.lr))
+
         # evaluation
         metrics = self.evaluate(val_set)
         score = metrics[self.config.metric_val] # selection
@@ -176,7 +171,7 @@ class Img2SeqModel(BaseModel):
         references, hypotheses = [], []
         n_words, ce_words = 0, 0 # sum of ce for all words + nb of words
 
-        for img, formula in minibatches(val_set, self.config.batch_size):
+        for img, formula in minibatches(test_set, self.config.batch_size):
             fd = self._get_feed_dict(img, training=False, formula=formula,
                     dropout=1)
             ce_words_eval, n_words_eval, ids_eval = self.sess.run(
@@ -201,6 +196,6 @@ class Img2SeqModel(BaseModel):
                 self.config.path_results, self.config.id_END)
 
         ce_mean = ce_words / float(n_words)
-        scores["perplexity"] = np.exp(ce_mean)
+        scores["perplexity"] = - np.exp(ce_mean)
 
         return scores

@@ -2,8 +2,8 @@ import os
 import shutil
 
 
-from utils.data import load_tok_to_id, PAD, END
-from utils.general import get_logger, init_dir, init_file
+from ..utils.data import load_tok_to_id, PAD, END
+from ..utils.general import get_logger, init_dir, init_file
 
 
 class Config():
@@ -25,10 +25,10 @@ class Config():
 
         # load vocabs
         self.tok_to_id = load_tok_to_id(self.path_vocab)
-        self.id_to_tok = {idx: tok for tok, idx in tok_to_id.iteritems()}
+        self.id_to_tok = {idx: tok for tok, idx in self.tok_to_id.iteritems()}
         self.n_tok = len(self.tok_to_id)
 
-        self.attn_cell_config["num_proj"] = self.ntok
+        self.attn_cell_config["num_proj"] = self.n_tok
         self.id_PAD = self.tok_to_id[PAD]
         self.id_END = self.tok_to_id[END]
 
@@ -37,22 +37,22 @@ class Config():
 
     # directories
     dir_output = "results/full_eval_beam/"
-    dir_images = "../data/images_processed"
+    dir_images = "data/images_processed"
     dir_plots  = dir_output + "plots/"
     dir_model  = dir_output + "model.weights/"
 
     # paths
-    path_vocab          = "../data/latex_vocab.txt"
+    path_vocab          = "data/latex_vocab.txt"
     path_log            = dir_output + "log.txt"
     path_results        = dir_output + "results_val.txt"
     path_results_final  = dir_output + "results.txt"
     path_results_img    = dir_output + "images/"
 
     # training data
-    path_matching_train = "../data/train_filter.lst"
-    path_matching_val   = "../data/val_filter.lst"
-    path_matching_test  = "../data/test_filter.lst"
-    path_formulas       = "../data/norm.formulas.lst"
+    path_matching_train = "data/train_filter.lst"
+    path_matching_val   = "data/val_filter.lst"
+    path_matching_test  = "data/test_filter.lst"
+    path_formulas       = "data/norm.formulas.lst"
 
     max_length_formula = 150
     max_iter      = None
@@ -63,6 +63,11 @@ class Config():
     encode_mode = "vanilla"
 
     # decoder
+    path_embeddings = "data/embeddings.npz"
+    pretrained_embeddings = False
+    trainable_embeddings = True
+    dim_embeddings = 80
+
     attn_cell_config = {
         "cell_type": "lstm",
         "num_units": 512,
@@ -74,10 +79,7 @@ class Config():
     decoding = "greedy" # "greedy" or "beam_search"
     beam_size = 5
 
-    path_embeddings = "../data/embeddings.npz"
-    pretrained_embeddings = False
-    trainable_embeddings = True
-    dim_embeddings = 80
+
 
     # training parameters
     lr_method     = "Adam"
@@ -85,6 +87,7 @@ class Config():
     batch_size    = 20
     dropout       = 1 # keep_prob
     metric_val    = "perplexity"
+    clip          = -1
 
     # learning rate schedule
     lr_init       = 1e-3

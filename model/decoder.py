@@ -3,18 +3,19 @@ import tensorflow as tf
 from tensorflow.python.util import nest
 import tensorflow.contrib.layers as layers
 from tensorflow.contrib.rnn import GRUCell, LSTMCell
-from .dynamic_decode import dynamic_decode
-from .attention_mechanism import AttentionMechanism
-from .attention_cell import AttentionCell
-from .greedy_decoder_cell import GreedyDecoderCell
-from .beam_search_decoder_cell import BeamSearchDecoderCell
+
+
+from components.dynamic_decode import dynamic_decode
+from components.attention_mechanism import AttentionMechanism
+from components.attention_cell import AttentionCell
+from components.greedy_decoder_cell import GreedyDecoderCell
+from components.beam_search_decoder_cell import BeamSearchDecoderCell
 from utils.tf import weight_initializer
 
 
 class Decoder(object):
-    """
-    Implements this paper https://arxiv.org/pdf/1609.04938.pdf
-    """
+    """Implements this paper https://arxiv.org/pdf/1609.04938.pdf"""
+
     def __init__(self, config):
         self.config = config
 
@@ -27,23 +28,23 @@ class Decoder(object):
             formula: (tf.placeholder), shape = (N, T)
         Returns:
             pred_train: (tf.Tensor), shape = (?, ?, vocab_size) logits of each class
-            pret_test: (structure) 
+            pret_test: (structure)
                 - pred.test.logits, same as pred_train
                 - pred.test.ids, shape = (?, config.max_length_formula)
         """
         # get embeddings for training
-        
+
         if self.config.pretrained_embeddings:
             print("Reloading pretrained embeddings")
             npz_file = np.load(self.config.path_embeddings)
             embeddings = npz_file["arr-0"]
-            assert(embeddings.shape == [self.config.vocab_size, self.config.dim_embeddings])
+            assert(embeddings.shape == [self.config.n_tok, self.config.dim_embeddings])
             E = tf.get_variable("E", shape=embeddings.shape,
                                   dtype=tf.float32,
                                   initializer=tf.constant_initializer(embeddings),
                                   trainable=self.config.trainable_embeddings)
         else:
-            E = tf.get_variable("E", shape=[self.config.vocab_size, self.config.dim_embeddings], 
+            E = tf.get_variable("E", shape=[self.config.n_tok, self.config.dim_embeddings],
             dtype=tf.float32, initializer=embedding_initializer())
 
         start_token = tf.get_variable("start_token", shape=[self.config.dim_embeddings],
@@ -54,7 +55,7 @@ class Decoder(object):
         embedding_formula = tf.nn.embedding_lookup(E, formula)
         start_token_      = tf.reshape(start_token, [1, 1, self.config.dim_embeddings])
         start_tokens      = tf.tile(start_token_, multiples=[batch_size, 1, 1])
-        embedding_train   = tf.concat([start_tokens, embedding_formula[:, :-1, :]], axis=1) 
+        embedding_train   = tf.concat([start_tokens, embedding_formula[:, :-1, :]], axis=1)
 
 
         # attention cell
@@ -71,21 +72,21 @@ class Decoder(object):
             decoder_cell = GreedyDecoderCell(E, attn_cell, batch_size, start_token, self.config.id_END)
 
             test_outputs, _ = dynamic_decode(decoder_cell, self.config.max_length_formula+1)
-                
+
             if self.config.decoding == "beam_search":
                 attention_mechanism = AttentionMechanism(
-                    img=encoded_img, 
-                    dim_e=self.config.attn_cell_config["dim_e"], 
+                    img=encoded_img,
+                    dim_e=self.config.attn_cell_config["dim_e"],
                     tiles=self.config.beam_size)
-                
+
                 cell         = LSTMCell(self.config.attn_cell_config["num_units"], reuse=True)
                 attn_cell    = AttentionCell(cell, attention_mechanism, dropout, self.config.attn_cell_config)
 
-                decoder_cell = BeamSearchDecoderCell(E, attn_cell, batch_size, 
+                decoder_cell = BeamSearchDecoderCell(E, attn_cell, batch_size,
                         start_token, self.config.beam_size, self.config.id_END)
 
                 beam_search_outputs, _ = dynamic_decode(decoder_cell, self.config.max_length_formula+1)
-                
+
                 # concatenate beam search outputs with the greedy outputs
                 # greedy outputs comes last
                 time_greedy = tf.shape(test_outputs.ids)[1]
@@ -104,7 +105,7 @@ class Decoder(object):
                 test_outputs = nest.map_structure(
                     lambda t1, t2: tf.concat([t1, tf.expand_dims(t2, axis=2)], axis=2),
                     beam_search_outputs, test_outputs)
-        
+
         return train_outputs, test_outputs
 
 

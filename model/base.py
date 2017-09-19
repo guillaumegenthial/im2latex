@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import tensorflow as tf
 
 
@@ -20,8 +21,14 @@ class BaseModel(object):
 
 
     def build(self):
-        """To overwrite with model-specific logic"""
-        raise NotImplementedError
+        """To overwrite with model-specific logic
+
+        This logic must define
+            - self.loss
+            - self.lr
+            - etc.
+        """
+        self._build()
 
 
     def _build(self):
@@ -140,26 +147,33 @@ class BaseModel(object):
             best_score: (float)
 
         """
+        tic = time.time()
         best_score = None
         self._add_summary() # tensorboard
 
         for epoch in range(self.config.n_epochs):
             self.logger.info("Epoch {:}/{:}".format(epoch+1,
                     self.config.n_epochs))
-            score = self._run_epoch(train_set, val_set, lr_schedule)
+            score = self._run_epoch(train_set, val_set, epoch, lr_schedule)
 
             # save weights if we have new best score on eval
             if best_score is None or score >= best_score:
                 best_score = score
-                self.logger.info("- new best score ({})!".format(best_score))
+                self.logger.info("- New best score ({})!".format(best_score))
                 self.save_session()
-            if lr_schedule.early_stopping:
+            if lr_schedule.stop_training:
+                self.logger.info("- Early Stopping.")
                 break
+
+        # logging
+        toc = time.time()
+        self.logger.info("- Elapsed time: {:04.2f}, lr: {:04.5f}".format(
+                        toc-tic, lr_schedule.lr))
 
         return best_score
 
 
-    def _run_epoch(train_set, val_set, lr_schedule):
+    def _run_epoch(train_set, val_set, epoch, lr_schedule):
         """Model_specific method to overwrite
 
         Performs an epoch of training
@@ -167,6 +181,7 @@ class BaseModel(object):
         Args:
             train_set: Dataset instance
             val_set: Dataset instance
+            epoch: (int) id of the epoch, starting at 0
             lr_schedule: LRSchedule instance that takes care of learning proc
 
         Returns:
