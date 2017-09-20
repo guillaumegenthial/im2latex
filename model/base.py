@@ -194,14 +194,14 @@ class BaseModel(object):
         raise NotImplementedError
 
 
-    def evaluate(self, test_set, params=None):
+    def evaluate(self, test_set, params):
         """Evaluates model on test set
 
         Calls method run_evaluate on test_set and takes care of logging
 
         Args:
             test_set: instance of class Dataset
-            params: (dict) with extra params in it
+            params: (dict)
 
         Return:
             scores: (dict) scores["acc"] = 0.85 for instance
@@ -231,7 +231,7 @@ class BaseModel(object):
 
         Args:
             test_set: Dataset instance
-            params: (dict) with extra params in it
+            params: (dict)
 
         Returns:
             scores: (dict) scores["acc"] = 0.85 for instance

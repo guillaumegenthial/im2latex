@@ -14,22 +14,21 @@ class Config():
         dir_output      = self.dir_output
         self.dir_plots  = dir_output + "plots/"
         self.dir_model  = dir_output + "model.weights/"
-        self.dir_images_test_result = dir_output + "images_test_result/"
+        self.dir_formulas_val_result  = dir_output + "formulas_val/"
+        self.dir_formulas_test_result = dir_output + "formulas_test/"
+        self.dir_images_test_result_ref = dir_output + "images_test_result_ref/"
+        self.dir_images_test_result_hyp = dir_output + "images_test_result_hyp/"
 
-        # result paths
-        self.path_log                  = dir_output + "config.log"
-        self.path_formulas_val_result  = dir_output + "val.formulas.result.txt"
-        self.path_formulas_test_result = dir_output + "test.formulas.result.txt"
+        self.path_log = dir_output + "config.log"
 
         # directory for training outputs
         init_dir(self.dir_output)
         init_dir(self.dir_plots)
         init_dir(self.dir_model)
-        init_dir(self.dir_images_test_result)
-
-        # initializer file for answers
-        init_file(self.path_formulas_test_result)
-        init_file(self.path_formulas_val_result)
+        init_dir(self.dir_formulas_val_result)
+        init_dir(self.dir_formulas_test_result)
+        init_dir(self.dir_images_test_result_ref)
+        init_dir(self.dir_images_test_result_hyp)
 
         # load vocabs
         if load:

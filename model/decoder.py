@@ -66,45 +66,25 @@ class Decoder(object):
             train_outputs, _ = tf.nn.dynamic_rnn(attn_cell, embedding_train, initial_state=attn_cell.initial_state())
 
         with tf.variable_scope("attn_cell", reuse=True):
-            attention_mechanism = AttentionMechanism(encoded_img, self.config.attn_cell_config["dim_e"])
-            cell         = LSTMCell(self.config.attn_cell_config["num_units"], reuse=True)
-            attn_cell    = AttentionCell(cell, attention_mechanism, dropout, self.config.attn_cell_config)
-            decoder_cell = GreedyDecoderCell(E, attn_cell, batch_size, start_token, self.config.id_END)
 
-            test_outputs, _ = dynamic_decode(decoder_cell, self.config.max_length_formula+1)
-
-            if self.config.decoding == "beam_search":
-                attention_mechanism = AttentionMechanism(
-                    img=encoded_img,
-                    dim_e=self.config.attn_cell_config["dim_e"],
-                    tiles=self.config.beam_size)
-
+            if self.config.decoding == "greedy":
+                attention_mechanism = AttentionMechanism(encoded_img, self.config.attn_cell_config["dim_e"])
                 cell         = LSTMCell(self.config.attn_cell_config["num_units"], reuse=True)
                 attn_cell    = AttentionCell(cell, attention_mechanism, dropout, self.config.attn_cell_config)
+                decoder_cell = GreedyDecoderCell(E, attn_cell, batch_size, start_token, self.config.id_END)
 
+                test_outputs, _ = dynamic_decode(decoder_cell, self.config.max_length_formula+1)
+
+            elif self.config.decoding == "beam_search":
+                attention_mechanism = AttentionMechanism(img=encoded_img,
+                    dim_e=self.config.attn_cell_config["dim_e"],
+                    tiles=self.config.beam_size)
+                cell         = LSTMCell(self.config.attn_cell_config["num_units"], reuse=True)
+                attn_cell    = AttentionCell(cell, attention_mechanism, dropout, self.config.attn_cell_config)
                 decoder_cell = BeamSearchDecoderCell(E, attn_cell, batch_size,
                         start_token, self.config.beam_size, self.config.id_END)
 
-                beam_search_outputs, _ = dynamic_decode(decoder_cell, self.config.max_length_formula+1)
-
-                # concatenate beam search outputs with the greedy outputs
-                # greedy outputs comes last
-                time_greedy = tf.shape(test_outputs.ids)[1]
-                time_beam = tf.shape(beam_search_outputs.ids)[1]
-
-                test_outputs = nest.map_structure(
-                    lambda t, d: pad(t, d, time_beam - time_greedy),
-                    test_outputs,
-                    decoder_cell.final_output_dtype)
-
-                beam_search_outputs = nest.map_structure(
-                    lambda t, d: pad(t, d, time_greedy - time_beam),
-                    beam_search_outputs,
-                    decoder_cell.final_output_dtype)
-
-                test_outputs = nest.map_structure(
-                    lambda t1, t2: tf.concat([t1, tf.expand_dims(t2, axis=2)], axis=2),
-                    beam_search_outputs, test_outputs)
+                test_outputs, _ = dynamic_decode(decoder_cell, self.config.max_length_formula+1)
 
         return train_outputs, test_outputs
 

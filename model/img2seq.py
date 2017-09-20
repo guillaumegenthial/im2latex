@@ -6,7 +6,8 @@ import tensorflow.contrib.layers as layers
 
 from .utils.general import Progbar
 from .utils.data import minibatches, pad_batch_images, pad_batch_formulas
-from .evaluation.text import write_answers, score_file
+from .evaluation.util import write_answers
+from .evaluation.text import score_files
 
 
 from .encoder import Encoder
@@ -151,28 +152,35 @@ class Img2SeqModel(BaseModel):
 
         # evaluation
         scores = self.evaluate(val_set,
-                {"path_formulas_result": self.config.path_formulas_val_result})
+                {"dir_name": self.config.dir_formulas_val_result})
         score = scores[self.config.metric_val]
         lr_schedule.update(score=score)
 
         return score
 
 
-    def _run_evaluate(self, test_set, params):
+
+    def write_prediction(self, test_set, params):
         """Performs an epoch of evaluation
 
         Args:
             test_set: Dataset instance
             params: (dict) with extra params in it
-                - "path_formulas_result": (string)
+                - "dir_name": (string)
 
         Returns:
-            scores: (dict) scores["acc"] = 0.85 for instance
+            files: list of path to files
+            perp: (float) perplexity on test set
 
         """
-        references, hypotheses = [], []
-        n_words, ce_words = 0, 0 # sum of ce for all words + nb of words
+        # initialize containers of references and predictions
+        if self.config.decoding == "greedy":
+            refs, hyps = [], [[]]
+        elif self.config.decoding == "beam_search":
+            refs, hyps = [], [[] for i in range(self.config.beam_size)]
 
+        # iterate over the dataset
+        n_words, ce_words = 0, 0 # sum of ce for all words + nb of words
         for img, formula in minibatches(test_set, self.config.batch_size):
             fd = self._get_feed_dict(img, training=False, formula=formula,
                     dropout=1)
@@ -188,15 +196,33 @@ class Img2SeqModel(BaseModel):
 
             n_words += n_words_eval
             ce_words += ce_words_eval
-            for form, pred in zip(formula, ids_eval):
-                references.append(form)
-                hypotheses.append(pred)
+            for form, preds in zip(formula, ids_eval):
+                refs.append(form)
+                for i, pred in enumerate(preds):
+                    hyps[i].append(pred)
+
+        files = write_answers(refs, hyps, self.config.id_to_tok,
+                params["dir_name"], self.config.id_END)
+
+        perp = - np.exp(ce_words / float(n_words))
+
+        return files, perp
 
 
-        write_answers(references, hypotheses,
-                self.config.id_to_tok, params["path_formulas_result"],
-                self.config.id_END)
-        scores = score_file(params["path_formulas_result"])
-        scores["perplexity"] = - np.exp(ce_words / float(n_words))
+    def _run_evaluate(self, test_set, params):
+        """Performs an epoch of evaluation
+
+        Args:
+            test_set: Dataset instance
+            params: (dict) with extra params in it
+                - "dir_name": (string)
+
+        Returns:
+            scores: (dict) scores["acc"] = 0.85 for instance
+
+        """
+        files, perp = self.write_prediction(test_set, params)
+        scores = score_files(files[0], files[1])
+        scores["perplexity"] = perp
 
         return scores
