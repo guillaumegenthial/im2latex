@@ -1,5 +1,6 @@
 data/
 results/
+*.rsyncignore
 *.DS_Store
 *.pyc
 *.aux

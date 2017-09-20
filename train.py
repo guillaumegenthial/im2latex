@@ -8,19 +8,19 @@ from model.utils.lr_schedule import LRSchedule
 
 if __name__ == "__main__":
     # Load config
-    config = Small()
+    config = Config()
 
     # Load datasets
     train_set = DataGenerator(path_formulas=config.path_formulas_train,
             dir_images=config.dir_images_train, max_iter=config.max_iter,
             path_matching=config.path_matching_train, img_prepro=greyscale,
-            form_prepro=get_form_prepro(config.tok_to_id),
+            form_prepro=get_form_prepro(config.tok_to_id), bucket=True,
             max_len=config.max_length_formula)
 
     val_set = DataGenerator(path_formulas=config.path_formulas_val,
             dir_images=config.dir_images_val, max_iter=config.max_iter,
             path_matching=config.path_matching_val, img_prepro=greyscale,
-            form_prepro=get_form_prepro(config.tok_to_id),
+            form_prepro=get_form_prepro(config.tok_to_id), bucket=True,
             max_len=config.max_length_formula)
 
     n_batches_epoch = ((len(train_set) + config.batch_size - 1) //

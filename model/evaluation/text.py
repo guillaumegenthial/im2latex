@@ -23,6 +23,8 @@ def score_files(path_ref, path_hyp):
     formulas_ref = load_formulas(path_ref)
     formulas_hyp = load_formulas(path_hyp)
 
+    assert len(formulas_ref) == len(formulas_hyp)
+
     # tokenize
     refs = [ref.split(' ') for _, ref in formulas_ref.items()]
     hyps = [hyp.split(' ') for _, hyp in formulas_hyp.items()]
@@ -60,8 +62,8 @@ def bleu_score(references, hypotheses):
     """Computes bleu score.
 
     Args:
-        references: list of list         (one reference per hypothesis)
-        hypotheses: list of list of list (multiple hypotheses)
+        references: list of list (one reference per hypothesis)
+        hypotheses: list of list (multiple hypotheses)
 
     Returns:
         BLEU-4 score: (float)

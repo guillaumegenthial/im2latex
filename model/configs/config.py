@@ -45,7 +45,7 @@ class Config():
 
 
     # root directory for results
-    dir_output = "results/full_eval_beam/"
+    dir_output = "results/under_50_beam/"
 
     # data
     dir_images_train = "data/images_train/"
@@ -63,7 +63,7 @@ class Config():
     # vocab
     path_vocab         = "data/vocab.txt"
     min_count_tok      = 10
-    max_length_formula = 150
+    max_length_formula = 50
     max_iter           = None
 
     # encoder
@@ -85,7 +85,7 @@ class Config():
         "num_proj": None, # to be computed in __init__  because vocab size
         "dim_embeddings": dim_embeddings
     }
-    decoding = "greedy" # "greedy" or "beam_search"
+    decoding = "beam_search" # "greedy" or "beam_search"
     beam_size = 5
 
     # training parameters

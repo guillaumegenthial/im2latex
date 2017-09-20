@@ -184,9 +184,7 @@ def load_formulas(filename):
     formulas = dict()
     with open(filename) as f:
         for idx, line in enumerate(f):
-            line = line.strip()
-            if len(line) != 0:
-                formulas[idx] = line
+            formulas[idx] = line.strip()
 
     return formulas
 
