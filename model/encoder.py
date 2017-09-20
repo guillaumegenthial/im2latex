@@ -25,22 +25,31 @@ class Encoder(object):
         img = tf.cast(img, tf.float32) / 255.
 
         with tf.variable_scope("convolutional_encoder"):
+            # conv + max pool -> /2
             out = tf.layers.conv2d(img, 64, 3, 1, "SAME",
                     activation=tf.nn.relu)
+            out = tf.layers.max_pooling2d(out, 2, 2, "SAME")
 
-            out = tf.layers.conv2d(out, 128, 3, 2, "SAME",
+            # conv + max pool -> /2
+            out = tf.layers.conv2d(out, 128, 3, 1, "SAME",
+                    activation=tf.nn.relu)
+            out = tf.layers.max_pooling2d(out, 2, 2, "SAME")
+
+            # regular conv -> id
+            out = tf.layers.conv2d(out, 256, 3, 1, "SAME",
                     activation=tf.nn.relu)
 
             out = tf.layers.conv2d(out, 256, 3, 1, "SAME",
                     activation=tf.nn.relu)
 
-            out = tf.layers.conv2d(out, 256, 3, 2, "SAME",
-                    activation=tf.nn.relu)
-
             out = tf.layers.conv2d(out, 512, 3, 1, "SAME",
                     activation=tf.nn.relu)
 
-            out = tf.layers.conv2d(out, 512, 3, 2, "VALID",
+            # conv with stride /2 (replaces the 2 max pool + adds more params)
+            out = tf.layers.conv2d(out, 512, (2, 4), 2, "SAME")
+
+            # conv
+            out = tf.layers.conv2d(out, 512, 3, 1, "VALID",
                     activation=tf.nn.relu)
 
         return out
