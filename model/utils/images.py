@@ -60,6 +60,7 @@ def crop_image(img, output_path):
     Args:
         img: (string) path to image
         output_path: (string) path to output image
+
     """
     old_im = Image.open(img).convert('L')
     img_data = np.asarray(old_im, dtype=np.uint8) # height, width
@@ -147,8 +148,8 @@ def clean(dir_output, name):
 def build_image(item):
     idx, form, dir_images, quality, density, down_ratio, buckets = item
     name = str(idx)
-    path_img = convert_to_png(form, dir_images, name, quality, density, down_ratio,
-            buckets)
+    path_img = convert_to_png(form, dir_images, name, quality, density,
+            down_ratio, buckets)
     return (path_img, idx)
 
 

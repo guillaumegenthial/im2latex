@@ -15,30 +15,30 @@ def transpose_batch_time(t):
 
 
 def dynamic_decode(decoder_cell, maximum_iterations):
-    """
-    Similar to dynamic_rnn but to decode
+    """Similar to dynamic_rnn but to decode
 
     Args:
         decoder_cell: (instance of DecoderCell) with step method
         maximum_iterations: (int)
+
     """
     try:
-        maximum_iterations = tf.convert_to_tensor(maximum_iterations, dtype=tf.int32)
+        maximum_iterations = tf.convert_to_tensor(maximum_iterations,
+                dtype=tf.int32)
     except ValueError:
         pass
 
-    # create Tensor Array for outputs by mimicing the structure of decodercell output
+    # create TA for outputs by mimicing the structure of decodercell output
     def create_ta(d):
-        return tf.TensorArray(
-            dtype=d,
-            size=0,
-            dynamic_size=True)
+        return tf.TensorArray(dtype=d, size=0, dynamic_size=True)
 
     initial_time = tf.constant(0, dtype=tf.int32)
-    initial_outputs_ta = nest.map_structure(create_ta, decoder_cell.output_dtype)
+    initial_outputs_ta = nest.map_structure(create_ta,
+            decoder_cell.output_dtype)
     initial_state, initial_inputs, initial_finished = decoder_cell.initialize()
 
-    def condition(time, unused_outputs_ta, unused_state, unused_inputs, finished):
+    def condition(time, unused_outputs_ta, unused_state, unused_inputs,
+        finished):
         return tf.logical_not(tf.reduce_all(finished))
 
     def body(time, outputs_ta, state, inputs, finished):
@@ -58,7 +58,7 @@ def dynamic_decode(decoder_cell, maximum_iterations):
         res = tf.while_loop(
             condition,
             body,
-            loop_vars=[initial_time, initial_outputs_ta, initial_state, 
+            loop_vars=[initial_time, initial_outputs_ta, initial_state,
                        initial_inputs, initial_finished])
 
     # get final outputs and states

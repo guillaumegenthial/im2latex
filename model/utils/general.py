@@ -28,7 +28,8 @@ def get_logger(filename):
     logging.basicConfig(format='%(message)s', level=logging.INFO)
     handler = logging.FileHandler(filename)
     handler.setLevel(logging.INFO)
-    handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s: %(message)s'))
+    handler.setFormatter(logging.Formatter(
+            '%(asctime)s:%(levelname)s: %(message)s'))
     logging.getLogger().addHandler(handler)
     return logger
 
@@ -80,6 +81,7 @@ class Progbar(object):
         self.verbose = verbose
         self.discount = discount
 
+
     def update(self, current, values=[], exact=[], strict=[], exp_avg=[]):
         """
         Updates the progress bar.
@@ -93,7 +95,8 @@ class Progbar(object):
 
         for k, v in values:
             if k not in self.sum_values:
-                self.sum_values[k] = [v * (current - self.seen_so_far), current - self.seen_so_far]
+                self.sum_values[k] = [v * (current - self.seen_so_far),
+                        current - self.seen_so_far]
                 self.unique_values.append(k)
             else:
                 self.sum_values[k][0] += v * (current - self.seen_so_far)

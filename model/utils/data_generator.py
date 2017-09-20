@@ -218,7 +218,8 @@ class DataGenerator(object):
             quality: parameter for magick
             density: parameter for magick
             down_ratio: (int) downsampling ratio
-            buckets: list of tuples (list of sizes) to produce similar shape images
+            buckets: list of tuples (list of sizes) to produce similar
+                shape images
 
         """
         # 1. produce images

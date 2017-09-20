@@ -66,15 +66,7 @@ class Config():
     max_length_formula = 50
     max_iter           = None
 
-    # encoder
-    encoder_dim = 256
-    encode_with_lstm = False
-    encode_mode = "vanilla"
-
     # decoder
-    path_embeddings = "data/embeddings.npz"
-    pretrained_embeddings = False
-    trainable_embeddings = True
     dim_embeddings = 80
 
     attn_cell_config = {

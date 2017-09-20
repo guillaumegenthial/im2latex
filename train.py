@@ -8,7 +8,7 @@ from model.utils.lr_schedule import LRSchedule
 
 if __name__ == "__main__":
     # Load config
-    config = Config()
+    config = Small()
 
     # Load datasets
     train_set = DataGenerator(path_formulas=config.path_formulas_train,

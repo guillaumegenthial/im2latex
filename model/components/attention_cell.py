@@ -7,11 +7,15 @@ AttentionState = collections.namedtuple("AttentionState", ("cell_state", "o"))
 
 
 class AttentionCell(RNNCell):
-    def __init__(self, cell, attention_mechanism, dropout, attn_cell_config, dtype=tf.float32):
+    def __init__(self, cell, attention_mechanism, dropout, attn_cell_config,
+        dtype=tf.float32):
         """
         Args:
-            training: (tf.placeholder) bool
-            E: (tf.Variable) embeddings matrix
+            cell: (RNNCell)
+            attention_mechanism: (AttentionMechanism)
+            dropout: (tf.float)
+            attn_cell_config: (dict) hyper params
+
         """
         # variables and tensors
         self._cell                = cell
@@ -26,7 +30,7 @@ class AttentionCell(RNNCell):
         self._num_proj       = attn_cell_config.get("num_proj", 512)
         self._dim_embeddings = attn_cell_config.get("dim_embeddings", 512)
         self._dtype          = dtype
-        
+
         # for RNNCell
         self._state_size = AttentionState(self._cell._state_size, self._dim_o)
 
@@ -47,9 +51,7 @@ class AttentionCell(RNNCell):
 
 
     def initial_state(self):
-        """
-        Return initial state for the lstm
-        """
+        """Returns initial state for the lstm"""
         initial_cell_state = self._attention_mechanism.initial_cell_state(self._cell)
         initial_o          = self._attention_mechanism.initial_state("o", self._dim_o)
 
@@ -59,9 +61,10 @@ class AttentionCell(RNNCell):
     def step(self, embedding, attn_cell_state):
         """
         Args:
-            embedding: shape =  (batch_size, dim_embeddings) embeddings
+            embedding: shape = (batch_size, dim_embeddings) embeddings
                 from previous time step
-            state: hidden state from previous time step
+            attn_cell_state: (AttentionState) state from previous time step
+
         """
         prev_cell_state, o = attn_cell_state
 
@@ -76,15 +79,17 @@ class AttentionCell(RNNCell):
             c = self._attention_mechanism.context(new_h)
 
             # compute o
-            o_W_c   = tf.get_variable("o_W_c", shape=(self._n_channels, self._dim_o), dtype=tf.float32)
-            o_W_h   = tf.get_variable("o_W_h", shape=(self._num_units, self._dim_o), dtype=tf.float32)
+            o_W_c = tf.get_variable("o_W_c", dtype=tf.float32,
+                    shape=(self._n_channels, self._dim_o))
+            o_W_h = tf.get_variable("o_W_h", dtype=tf.float32,
+                    shape=(self._num_units, self._dim_o))
 
             new_o = tf.tanh(tf.matmul(new_h, o_W_h) + tf.matmul(c, o_W_c))
             new_o = tf.nn.dropout(new_o, self._dropout)
 
-            # new_o = new_h
-            y_W_o  = tf.get_variable("y_W_o", shape=(self._dim_o, self._num_proj), dtype=tf.float32)
-            logits  = tf.matmul(new_o, y_W_o)
+            y_W_o = tf.get_variable("y_W_o", dtype=tf.float32,
+                    shape=(self._dim_o, self._num_proj))
+            logits = tf.matmul(new_o, y_W_o)
 
             # new Attn cell state
             new_state = AttentionState(new_cell_state, new_o)
@@ -92,13 +97,15 @@ class AttentionCell(RNNCell):
             return logits, new_state
 
 
-    def __call__(self, embedding, state):
+    def __call__(self, inputs, state):
         """
         Args:
             inputs: the embedding of the previous word for training only
-            state: tuple: (h, o) where h is the hidden state and o is the vector 
-                used to make the prediction of the previous word
+            state: (AttentionState) (h, o) where h is the hidden state and
+                o is the vector used to make the prediction of
+                the previous word
+
         """
-        new_output, new_state = self.step(embedding, state)
-        
-        return (new_output, new_state)   
+        new_output, new_state = self.step(inputs, state)
+
+        return (new_output, new_state)

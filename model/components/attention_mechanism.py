@@ -2,24 +2,22 @@ import tensorflow as tf
 
 
 class AttentionMechanism(object):
-    """
-    Class to compute attention over an image
-    """
-    def __init__(self, img, dim_e, tiles=1):
-        """
-        Store the image under the right shape.
+    """Class to compute attention over an image"""
 
-        We loose the H, W dimensions and merge them into a single 
+    def __init__(self, img, dim_e, tiles=1):
+        """Stores the image under the right shape.
+
+        We loose the H, W dimensions and merge them into a single
         dimension that corresponds to "regions" of the image.
 
         Args:
             img: (tf.Tensor) image
-            dim_e: (int) dimension of the intermediary vector used to 
+            dim_e: (int) dimension of the intermediary vector used to
                 compute attention
             tiles: (int) default 1, input to context h may have size
                     (tile * batch_size, ...)
+
         """
-        # define self._img = (N, R, C)
         if len(img.shape) == 3:
             self._img = img
         elif len(img.shape) == 4:
@@ -39,8 +37,6 @@ class AttentionMechanism(object):
         self._scope_name = "att_mechanism"
 
         # attention vector over the image
-        # more efficient to do it here than at every time step! 
-        # (50% faster on long sentences)
         self._att_img = tf.layers.dense(
             inputs=self._img,
             units=self._dim_e,
@@ -49,40 +45,40 @@ class AttentionMechanism(object):
 
 
     def context(self, h):
-        """
-        Computes attention
+        """Computes attention
 
         Args:
-            h: (batch_size, num_units) hidden state 
-        
+            h: (batch_size, num_units) hidden state
+
         Returns:
             c: (batch_size, channels) context vector
+
         """
         with tf.variable_scope(self._scope_name):
             if self._tiles > 1:
                 att_img = tf.expand_dims(self._att_img, axis=1)
                 att_img = tf.tile(att_img, multiples=[1, self._tiles, 1, 1])
-                att_img = tf.reshape(att_img, shape=[-1, self._n_regions, self._dim_e])
-                img     = tf.expand_dims(self._img, axis=1)
-                img     = tf.tile(img, multiples=[1, self._tiles, 1, 1])
-                img     = tf.reshape(img, shape=[-1, self._n_regions, self._n_channels])
+                att_img = tf.reshape(att_img, shape=[-1, self._n_regions,
+                        self._dim_e])
+                img = tf.expand_dims(self._img, axis=1)
+                img = tf.tile(img, multiples=[1, self._tiles, 1, 1])
+                img = tf.reshape(img, shape=[-1, self._n_regions,
+                        self._n_channels])
             else:
                 att_img = self._att_img
                 img     = self._img
 
-            # compute attention over the hidden vector
-            att_h = tf.layers.dense(
-                inputs=h,
-                units=self._dim_e,
-                use_bias=False)
+            # computes attention over the hidden vector
+            att_h = tf.layers.dense(inputs=h, units=self._dim_e, use_bias=False)
 
-            # sum the two contributions
+            # sums the two contributions
             att_h = tf.expand_dims(att_h, axis=1)
             att = tf.tanh(att_img + att_h)
 
-            # compute scalar product with beta vector
+            # computes scalar product with beta vector
             # works faster with a matmul than with a * and a tf.reduce_sum
-            att_beta = tf.get_variable("att_beta", shape=[self._dim_e, 1], dtype=tf.float32)
+            att_beta = tf.get_variable("att_beta", shape=[self._dim_e, 1],
+                    dtype=tf.float32)
             att_flat = tf.reshape(att, shape=[-1, self._dim_e])
             e = tf.matmul(att_flat, att_beta)
             e = tf.reshape(e, shape=[-1, self._n_regions])
@@ -96,14 +92,14 @@ class AttentionMechanism(object):
 
 
     def initial_cell_state(self, cell):
-        """
-        Return initial state of a cell computed from the image
-        Assumes cell.state_type is an instance of named_tuple.
+        """Returns initial state of a cell computed from the image
 
+        Assumes cell.state_type is an instance of named_tuple.
         Ex: LSTMStateTuple
 
         Args:
             cell: (instance of RNNCell) must define _state_size
+
         """
         _states_0 = []
         for hidden_name in cell._state_size._fields:
@@ -117,15 +113,11 @@ class AttentionMechanism(object):
 
 
     def initial_state(self, name, dim):
-        """
-        Return initial state of dimension specified by dim
-        Creates new variables given by name.
-        """
-        # initial state
-         # mean of image (for initial states)
+        """Returns initial state of dimension specified by dim"""
         with tf.variable_scope(self._scope_name):
             img_mean = tf.reduce_mean(self._img, axis=1)
-            W = tf.get_variable("W_{}_0".format(name), shape=[self._n_channels, dim])
+            W = tf.get_variable("W_{}_0".format(name), shape=[self._n_channels,
+                    dim])
             b = tf.get_variable("b_{}_0".format(name), shape=[dim])
             h = tf.tanh(tf.matmul(img_mean, W) + b)
 

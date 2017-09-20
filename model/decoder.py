@@ -10,7 +10,6 @@ from components.attention_mechanism import AttentionMechanism
 from components.attention_cell import AttentionCell
 from components.greedy_decoder_cell import GreedyDecoderCell
 from components.beam_search_decoder_cell import BeamSearchDecoderCell
-from utils.tf import weight_initializer
 
 
 class Decoder(object):
@@ -18,103 +17,118 @@ class Decoder(object):
 
     def __init__(self, config):
         self.config = config
+        self._tiles = 1 if config.decoding == "greedy" else config.beam_size
 
 
-    def __call__(self, training, encoded_img, formula, dropout):
-        """
+    def __call__(self, training, img, formula, dropout):
+        """Decodes an image into a sequence of token
+
         Args:
             training: (tf.placeholder) bool
-            encoded_img: (tf.Tensor) shape = (N, H, W, C)
+            img: encoded image (tf.Tensor) shape = (N, H, W, C)
             formula: (tf.placeholder), shape = (N, T)
+
         Returns:
             pred_train: (tf.Tensor), shape = (?, ?, vocab_size) logits of each class
             pret_test: (structure)
                 - pred.test.logits, same as pred_train
                 - pred.test.ids, shape = (?, config.max_length_formula)
+
         """
-        # get embeddings for training
+        E = tf.get_variable("E", initializer=embedding_initializer(),
+                shape=[self.config.n_tok, self.config.dim_embeddings],
+                dtype=tf.float32)
 
-        if self.config.pretrained_embeddings:
-            print("Reloading pretrained embeddings")
-            npz_file = np.load(self.config.path_embeddings)
-            embeddings = npz_file["arr-0"]
-            assert(embeddings.shape == [self.config.n_tok, self.config.dim_embeddings])
-            E = tf.get_variable("E", shape=embeddings.shape,
-                                  dtype=tf.float32,
-                                  initializer=tf.constant_initializer(embeddings),
-                                  trainable=self.config.trainable_embeddings)
-        else:
-            E = tf.get_variable("E", shape=[self.config.n_tok, self.config.dim_embeddings],
-            dtype=tf.float32, initializer=embedding_initializer())
+        start_token = tf.get_variable("start_token", dtype=tf.float32,
+                shape=[self.config.dim_embeddings],
+                initializer=embedding_initializer())
 
-        start_token = tf.get_variable("start_token", shape=[self.config.dim_embeddings],
-            dtype=tf.float32, initializer=embedding_initializer())
+        batch_size = tf.shape(formula)[0]
 
-        # embedding with start token
-        batch_size        = tf.shape(formula)[0]
-        embedding_formula = tf.nn.embedding_lookup(E, formula)
-        start_token_      = tf.reshape(start_token, [1, 1, self.config.dim_embeddings])
-        start_tokens      = tf.tile(start_token_, multiples=[batch_size, 1, 1])
-        embedding_train   = tf.concat([start_tokens, embedding_formula[:, :-1, :]], axis=1)
+        # training
+        with tf.variable_scope("attn_cell", reuse=False):
+            embeddings = get_embeddings(formula, E, self.config.dim_embeddings,
+                    start_token, batch_size)
+            attn_meca = AttentionMechanism(img,
+                    self.config.attn_cell_config["dim_e"])
+            recu_cell = LSTMCell(self.config.attn_cell_config["num_units"])
+            attn_cell = AttentionCell(recu_cell, attn_meca, dropout,
+                    self.config.attn_cell_config)
 
+            train_outputs, _ = tf.nn.dynamic_rnn(attn_cell, embeddings,
+                    initial_state=attn_cell.initial_state())
 
-        # attention cell
-        with tf.variable_scope("attn_cell", reuse=False, initializer=weight_initializer()):
-            attention_mechanism = AttentionMechanism(encoded_img, self.config.attn_cell_config["dim_e"])
-            cell      = LSTMCell(self.config.attn_cell_config["num_units"])
-            attn_cell = AttentionCell(cell, attention_mechanism, dropout, self.config.attn_cell_config)
-            train_outputs, _ = tf.nn.dynamic_rnn(attn_cell, embedding_train, initial_state=attn_cell.initial_state())
-
+        # decoding
         with tf.variable_scope("attn_cell", reuse=True):
-
-            if self.config.decoding == "greedy":
-                attention_mechanism = AttentionMechanism(encoded_img, self.config.attn_cell_config["dim_e"])
-                cell         = LSTMCell(self.config.attn_cell_config["num_units"], reuse=True)
-                attn_cell    = AttentionCell(cell, attention_mechanism, dropout, self.config.attn_cell_config)
-                decoder_cell = GreedyDecoderCell(E, attn_cell, batch_size, start_token, self.config.id_END)
-
-                test_outputs, _ = dynamic_decode(decoder_cell, self.config.max_length_formula+1)
-
-            elif self.config.decoding == "beam_search":
-                attention_mechanism = AttentionMechanism(img=encoded_img,
+            attn_meca = AttentionMechanism(img=img,
                     dim_e=self.config.attn_cell_config["dim_e"],
-                    tiles=self.config.beam_size)
-                cell         = LSTMCell(self.config.attn_cell_config["num_units"], reuse=True)
-                attn_cell    = AttentionCell(cell, attention_mechanism, dropout, self.config.attn_cell_config)
-                decoder_cell = BeamSearchDecoderCell(E, attn_cell, batch_size,
-                        start_token, self.config.beam_size, self.config.id_END)
+                    tiles=self._tiles)
+            recu_cell = LSTMCell(self.config.attn_cell_config["num_units"],
+                    reuse=True)
+            attn_cell = AttentionCell(recu_cell, attn_meca, dropout,
+                    self.config.attn_cell_config)
+            decoder_cell = get_decoder_cell(self.config, E, attn_cell,
+                    batch_size, start_token)
 
-                test_outputs, _ = dynamic_decode(decoder_cell, self.config.max_length_formula+1)
+            test_outputs, _ = dynamic_decode(decoder_cell,
+                    self.config.max_length_formula+1)
 
         return train_outputs, test_outputs
 
 
-def pad(t, d, time_diff):
-    def _pad(t, d):
-        batch_size = tf.shape(t)[0]
+def get_decoder_cell(config, E, attn_cell, batch_size, start_token):
+    """Returns the cell given a config
 
-        if t.shape.ndims == 2:
-            pad_array = tf.zeros([batch_size, time_diff], dtype=d)
-        elif t.shape.ndims == 3:
-            pad_array = tf.zeros([batch_size, time_diff, tf.shape(t)[2]], dtype=d)
-        elif t.shape.ndims == 4:
-            pad_array = tf.zeros([batch_size, time_diff, tf.shape(t)[2], tf.shape(t)[3]], dtype=d)
-        else:
-            raise NotImplementedError
+    Args:
+        config: Config() instance
+        att_cell: AttentionCell instance
+        batch_size: shape
+        start_token: embedding of the start token
 
-        return tf.concat([t, pad_array], axis=1)
+    Returns:
+        decoder_cell: instance of decoder cell
 
-    return tf.cond(
-        time_diff > 0,
-        lambda: _pad(t, d),
-        lambda: t)
+    """
+    if config.decoding == "greedy":
+        decoder_cell = GreedyDecoderCell(E, attn_cell, batch_size, start_token,
+                config.id_END)
+    elif config.decoding == "beam_search":
+        decoder_cell = BeamSearchDecoderCell(E, attn_cell, batch_size,
+                start_token, config.beam_size, config.id_END)
+    else:
+        raise NotImplementedError
+
+    return decoder_cell
+
+
+def get_embeddings(formula, E, dim, start_token, batch_size):
+    """Returns the embedding of the n-1 first elements in the formula concat
+    with the start token
+
+    Args:
+        formula: (tf.placeholder) tf.uint32
+        E: tf.Variable (matrix)
+        dim: (int) dimension of embeddings
+        start_token: tf.Variable
+        batch_size: tf variable extracted from placeholder
+
+    Returns:
+        embeddings_train: tensor
+
+    """
+    formula_ = tf.nn.embedding_lookup(E, formula)
+    start_token_ = tf.reshape(start_token, [1, 1, dim])
+    start_tokens = tf.tile(start_token_, multiples=[batch_size, 1, 1])
+    embeddings = tf.concat([start_tokens, formula_[:, :-1, :]], axis=1)
+
+    return embeddings
 
 
 def embedding_initializer():
+    """Returns initializer for embeddings"""
     def _initializer(shape, dtype, partition_info=None):
         E = tf.random_uniform(shape, minval=-1.0, maxval=1.0, dtype=dtype)
         E = tf.nn.l2_normalize(E, -1)
-
         return E
 
     return _initializer
