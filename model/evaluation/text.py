@@ -30,28 +30,26 @@ def score_files(path_ref, path_hyp):
     hyps = [hyp.split(' ') for _, hyp in formulas_hyp.items()]
 
     # score
-    scores           = dict()
-    scores["BLEU-4"] = bleu_score(refs, hyps)
-    scores["EM"]     = exact_match_score(refs, hyps)
-    scores["Lev"]    = edit_distance(refs, hyps)
-
-    return scores
+    return {
+            "BLEU-4": bleu_score(refs, hyps),
+            "EM": exact_match_score(refs, hyps),
+            "Edit": edit_distance(refs, hyps)
+            }
 
 
 def exact_match_score(references, hypotheses):
     """Computes exact match scores.
 
     Args:
-        references: list of list of list of ids of tokens (multiple refs)
-        hypotheses: list of list of ids of tokens (one hypothesis)
+        references: list of list of tokens (one ref)
+        hypotheses: list of list of tokens (one hypothesis)
 
     Returns:
         exact_match: (float) 1 is perfect
 
     """
     exact_match = 0
-    for refs, hypo in zip(references, hypotheses):
-        ref = refs[0] # only take first ref
+    for ref, hypo in zip(references, hypotheses):
         if np.array_equal(ref, hypo):
             exact_match += 1
 
@@ -62,14 +60,14 @@ def bleu_score(references, hypotheses):
     """Computes bleu score.
 
     Args:
-        references: list of list (one reference per hypothesis)
-        hypotheses: list of list (multiple hypotheses)
+        references: list of list (one hypothesis)
+        hypotheses: list of list (one hypothesis)
 
     Returns:
         BLEU-4 score: (float)
 
     """
-    references = [[ref] for ref in references]
+    references = [[ref] for ref in references] # for corpus_bleu func
     BLEU_4 = nltk.translate.bleu_score.corpus_bleu(references, hypotheses,
         weights=(0.25, 0.25, 0.25, 0.25))
     return BLEU_4
@@ -79,16 +77,15 @@ def edit_distance(references, hypotheses):
     """Computes Levenshtein distance between two sequences.
 
     Args:
-        references: list of lists of list (multiple references per hypothesis)
-        hypotheses: list of list (one hypothesis)
+        references: list of list of token (one hypothesis)
+        hypotheses: list of list of token (one hypothesis)
 
     Returns:
         1 - levenshtein distance: (higher is better, 1 is perfect)
 
     """
     d_leven, len_tot = 0, 0
-    for refs, hypo in zip(references, hypotheses):
-        ref = refs[0] # only take first reference
+    for ref, hypo in zip(references, hypotheses):
         d_leven += distance.levenshtein(ref, hypo)
         len_tot += float(max(len(ref), len(hypo)))
 
