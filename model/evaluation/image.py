@@ -22,27 +22,25 @@ def score_dirs(dir_ref, dir_hyp, prepro_img):
     em_tot = l_dist_tot = length_tot = n_ex = 0
 
     for img_name in img_refs:
-        if img_name in img_hyps:
-            # load images
-            img_ref = imread(dir_ref + img_name)
-            img_ref = prepro_img(img_ref)
+        img_ref = imread(dir_ref + img_name)
+        img_ref = prepro_img(img_ref)
 
+        if img_name in img_hyps:
             img_hyp = imread(dir_hyp + img_name)
             img_hyp = prepro_img(img_hyp)
-
-            # compute scores
             l_dist, length = img_edit_distance(img_ref, img_hyp)
+        else:
+            l_dist = length = img_ref.shape[1]
 
-            l_dist_tot += l_dist
-            length_tot += length
-            if l_dist < 1:
-                em_tot += 1
-            n_ex += 1
+        l_dist_tot += l_dist
+        length_tot += length
+        if l_dist < 1: em_tot += 1
+        n_ex += 1
 
     # compute scores
     scores = dict()
-    scores["EM"]  = em_tot / float(n_ex)
-    scores["Lev"] = 1. - l_dist_tot / float(length_tot)
+    scores["EM"]  = em_tot / float(n_ex) if next > 0 else 0
+    scores["Lev"] = 1 - l_dist_tot / float(length_tot) if length_tot > 0 else 0
 
     return scores
 

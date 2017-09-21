@@ -35,19 +35,18 @@ class Decoder(object):
                 - pred.test.ids, shape = (?, config.max_length_formula)
 
         """
+        dim_embeddings = self.config.attn_cell_config.get("dim_embeddings")
         E = tf.get_variable("E", initializer=embedding_initializer(),
-                shape=[self.config.n_tok, self.config.dim_embeddings],
-                dtype=tf.float32)
+                shape=[self.config.n_tok, dim_embeddings], dtype=tf.float32)
 
         start_token = tf.get_variable("start_token", dtype=tf.float32,
-                shape=[self.config.dim_embeddings],
-                initializer=embedding_initializer())
+                shape=[dim_embeddings], initializer=embedding_initializer())
 
         batch_size = tf.shape(formula)[0]
 
         # training
         with tf.variable_scope("attn_cell", reuse=False):
-            embeddings = get_embeddings(formula, E, self.config.dim_embeddings,
+            embeddings = get_embeddings(formula, E, dim_embeddings,
                     start_token, batch_size)
             attn_meca = AttentionMechanism(img,
                     self.config.attn_cell_config["dim_e"])

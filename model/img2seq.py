@@ -29,7 +29,24 @@ class Img2SeqModel(BaseModel):
         self._add_pred_op()
         self._add_loss_op()
 
-        self._build() # train op and init session
+        self._add_train_op(self.config.lr_method, self.lr, self.loss,
+                self.config.clip)
+        self.init_session()
+
+        self.logger.info("- done.")
+
+
+    def build_inference(self):
+        self.logger.info("Building model...")
+
+        self.encoder = Encoder(self.config)
+        self.decoder = Decoder(self.config)
+
+        self._add_placeholders_op()
+        self._add_pred_op()
+        self._add_loss_op()
+
+        self.init_session()
 
         self.logger.info("- done.")
 
@@ -154,7 +171,7 @@ class Img2SeqModel(BaseModel):
 
         # evaluation
         scores = self.evaluate(val_set,
-                {"dir_name": self.config.dir_formulas_val_result})
+                {"dir_name": self.dir_output + "formulas_val/"})
         score = scores[self.config.metric_val]
         lr_schedule.update(score=score)
 

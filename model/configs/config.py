@@ -1,97 +1,62 @@
 import os
-import shutil
+from shutil import copyfile
 
 
 from ..utils.data import load_tok_to_id, PAD, END
 from ..utils.general import get_logger, init_dir, init_file
+from .load import load_config_json, init_directories
 
 
 class Config():
+    """Class that loads hyperparameters from json file"""
 
-    def __init__(self, load=True):
-        """Creates output directories if they don't exist and load vocabulary"""
-        # result directories
-        dir_output      = self.dir_output
-        self.dir_plots  = dir_output + "plots/"
-        self.dir_model  = dir_output + "model.weights/"
-        self.dir_formulas_val_result  = dir_output + "formulas_val/"
-        self.dir_formulas_test_result = dir_output + "formulas_test/"
-        self.dir_images_test_result_ref = dir_output + "images_test_result_ref/"
-        self.dir_images_test_result_hyp = dir_output + "images_test_result_hyp/"
+    def __init__(self, jsons=None, path_vocab=None):
+        """
+        Args:
+            jsons: list of path_to_json files
+            path_vocab: path
 
-        self.path_log = dir_output + "config.log"
+        """
+        if jsons is not None:
+            for path_json in jsons:
+                self.load_config(path_json)
+                copyfile(path_json, self.dir_output + DEFAULT_CONFIG)
+            self.load_logger()
 
-        # directory for training outputs
-        init_dir(self.dir_output)
-        init_dir(self.dir_plots)
-        init_dir(self.dir_model)
-        init_dir(self.dir_formulas_val_result)
-        init_dir(self.dir_formulas_test_result)
-        init_dir(self.dir_images_test_result_ref)
-        init_dir(self.dir_images_test_result_hyp)
-
-        # load vocabs
-        if load:
-            self.tok_to_id = load_tok_to_id(self.path_vocab)
-            self.id_to_tok = {idx: tok for tok, idx in
-                              self.tok_to_id.iteritems()}
-            self.n_tok = len(self.tok_to_id)
-
-            self.attn_cell_config["num_proj"] = self.n_tok
-            self.id_PAD = self.tok_to_id[PAD]
-            self.id_END = self.tok_to_id[END]
-
-        self.logger = get_logger(self.path_log)
+        if path_vocab is not None:
+            self.load_vocab(path_vocab)
+            copyfile(path_vocab, self.dir_output + DEFAULT_VOCAB)
 
 
-    # root directory for results
-    dir_output = "results/under_50_beam/"
+    def load_config(self, path_json):
+        json_config = load_config_json(path_json)
+        self.__dict__.update(json_config)
+        init_directories(json_config)
 
-    # data
-    dir_images_train = "data/images_train/"
-    dir_images_test  = "data/images_test/"
-    dir_images_val   = "data/images_val/"
 
-    path_matching_train = "data/train.matching.txt"
-    path_matching_val   = "data/val.matching.txt"
-    path_matching_test  = "data/test.matching.txt"
+    def load_logger(self):
+        self.logger = get_logger(self.dir_output + DEFAULT_LOG)
 
-    path_formulas_train = "data/train.formulas.norm.txt"
-    path_formulas_test  = "data/test.formulas.norm.txt"
-    path_formulas_val   = "data/val.formulas.norm.txt"
 
-    # vocab
-    path_vocab         = "data/vocab.txt"
-    min_count_tok      = 10
-    max_length_formula = 50
-    max_iter           = None
+    def load_vocab(self, path_vocab=None):
+        path_vocab = self.path_vocab if path_vocab is None
+        self.tok_to_id = load_tok_to_id(path_vocab)
+        self.id_to_tok = {idx: tok for tok, idx in self.tok_to_id.iteritems()}
+        self.n_tok = len(self.tok_to_id)
 
-    # decoder
-    dim_embeddings = 80
+        self.attn_cell_config["num_proj"] = self.n_tok
+        self.id_PAD = self.tok_to_id[PAD]
+        self.id_END = self.tok_to_id[END]
 
-    attn_cell_config = {
-        "cell_type": "lstm",
-        "num_units": 512,
-        "dim_e": 512,
-        "dim_o": 512,
-        "num_proj": None, # to be computed in __init__  because vocab size
-        "dim_embeddings": dim_embeddings
-    }
-    decoding = "beam_search" # "greedy" or "beam_search"
-    beam_size = 5
 
-    # training parameters
-    lr_method     = "Adam"
-    n_epochs      = 15
-    batch_size    = 20
-    dropout       = 1 # keep_prob
-    metric_val    = "perplexity"
-    clip          = -1
+    def restore_from_dir(self, dir_output):
+        path_json = dir_output + DEFAULT_CONFIG
+        self.load_config(path_json)
 
-    # learning rate schedule
-    lr_init       = 1e-3
-    lr_min        = 1e-4
-    start_decay   = 9 # start decaying
-    end_decay     = 13 # end decay
-    lr_warm       = 1e-4 # warm up: small lr because of high gradients
-    end_warm      = 2 # keep warm up for 2 epochs
+        self.dir_output = dir_output # overwrite
+        self.load_logger()
+
+        path_vocab = dir_output + DEFAULT_VOCAB
+        self.load_vocab(path_vocab)
+
+

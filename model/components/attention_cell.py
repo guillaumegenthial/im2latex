@@ -28,7 +28,7 @@ class AttentionCell(RNNCell):
         self._dim_o          = attn_cell_config.get("dim_o", 512)
         self._num_units      = attn_cell_config.get("num_units", 512)
         self._num_proj       = attn_cell_config.get("num_proj", 512)
-        self._dim_embeddings = attn_cell_config.get("dim_embeddings", 512)
+        self._dim_embeddings = attn_cell_config.get("dim_embeddings", 80)
         self._dtype          = dtype
 
         # for RNNCell

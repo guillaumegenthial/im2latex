@@ -4,6 +4,9 @@ import time
 import tensorflow as tf
 
 
+from .utils.general import init_dir
+
+
 class BaseModel(object):
     """Generic class for tf models"""
 
@@ -28,15 +31,7 @@ class BaseModel(object):
             - self.lr
             - etc.
         """
-        self._build()
-
-
-    def _build(self):
-        """Generic Build method for models"""
-        self._add_train_op(self.config.lr_method, self.lr, self.loss,
-                self.config.clip)
-        self.init_session() # now self.sess is defined and vars are init
-
+        raise NotImplementedError
 
 
     def _add_train_op(self, lr_method, lr, loss, clip=-1):
@@ -96,20 +91,20 @@ class BaseModel(object):
     def save_session(self):
         """Saves session"""
         # check dir one last time
-        if not os.path.exists(self.config.dir_model):
-            os.makedirs(self.config.dir_model)
+        dir_model = self.config.dir_output + "model.weights/"
+        init_dir(dir_model)
 
         # logging
         sys.stdout.write("\r- Saving model...")
         sys.stdout.flush()
 
         # saving
-        self.saver.save(self.sess, self.config.dir_model)
+        self.saver.save(self.sess, dir_model)
 
         # logging
         sys.stdout.write("\r")
         sys.stdout.flush()
-        self.logger.info("- Saved model in {}".format(self.config.dir_model))
+        self.logger.info("- Saved model in {}".format(dir_model))
 
 
     def close_session(self):

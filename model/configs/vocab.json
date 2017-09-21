@@ -1,0 +1,4 @@
+{
+    "path_vocab"   : "data/vocab.txt",
+    "min_count_tok": 10
+}

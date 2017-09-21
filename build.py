@@ -1,12 +1,11 @@
 from model.utils.data_generator import DataGenerator
 from model.utils.data import build_vocab, write_vocab
 from model.configs.config import Config
-from model.configs.small import Small
 from model.utils.images import build_images
 
 
 if __name__ == "__main__":
-    config = Small(load=False)
+    config = Config("model/configs/small.json")
 
     # datasets
     train_set = DataGenerator(

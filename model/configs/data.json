@@ -1,0 +1,16 @@
+{
+    "dir_images_train": "data/images_train/",
+    "dir_images_test" : "data/images_test/",
+    "dir_images_val"  : "data/images_val/",
+
+    "path_matching_train": "data/train.matching.txt",
+    "path_matching_val"  : "data/val.matching.txt",
+    "path_matching_test" : "data/test.matching.txt",
+
+    "path_formulas_train": "data/train.formulas.norm.txt",
+    "path_formulas_test" : "data/test.formulas.norm.txt",
+    "path_formulas_val"  : "data/val.formulas.norm.txt",
+
+    "max_iter"          : null,
+    "max_length_formula": 50,
+}
