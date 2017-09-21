@@ -90,9 +90,8 @@ class Config():
 
     # learning rate schedule
     lr_init       = 1e-3
-    lr_min        = 1e-5
+    lr_min        = 1e-4
     start_decay   = 9 # start decaying
     end_decay     = 13 # end decay
-    decay_rate    = 0.5 # decay rate if perf does not improve
     lr_warm       = 1e-4 # warm up: small lr because of high gradients
     end_warm      = 2 # keep warm up for 2 epochs

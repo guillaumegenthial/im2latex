@@ -6,9 +6,17 @@ class LRSchedule(object):
 
     Implements
         - (time) exponential decay with custom range
-        - (time) warm start
+            - needs to set start_decay, end_decay, lr_init and lr_min
+            - set end_decay to None to deactivate
+        - (time) warm start:
+            - needs to set lr_warm, end_warm.
+            - set end_warm to None to deactivate
         - (score) mult decay if no improvement over score
+            - needs to set decay_rate
+            - set decay_rate to None to deactivate
         - (score) early stopping if no imprv
+            - needs to set early_stopping
+            - set early_stopping to None to deactivate
 
     All durations are measured in number of batches
     For usage, must call the update function at each batch.

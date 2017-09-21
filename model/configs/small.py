@@ -21,7 +21,7 @@ class Small(Config):
     path_formulas_val   = "data/small.formulas.norm.txt"
 
     n_epochs = 2
-    batch_size = 10
+    batch_size = 3
     max_iter = 10
     decoding = "beam_search"
     encode_with_lstm = False

@@ -128,7 +128,7 @@ class Img2SeqModel(BaseModel):
         # logging
         batch_size = self.config.batch_size
         nbatches = (len(train_set) + batch_size - 1) // batch_size
-        prog = Progbar(target=nbatches)
+        prog = Progbar(nbatches)
 
         # iterate over dataset
         for i, (img, formula) in enumerate(minibatches(train_set, batch_size)):
@@ -149,6 +149,8 @@ class Img2SeqModel(BaseModel):
             # update learning rate
             lr_schedule.update(batch_no=epoch*nbatches + i)
 
+        # logging
+        self.logger.info("- Training: {}".format(prog.info))
 
         # evaluation
         scores = self.evaluate(val_set,

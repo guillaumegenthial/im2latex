@@ -122,7 +122,7 @@ class DataGenerator(object):
 
 
         self._iter_mode = old_mode
-        self._length    = idx
+        self._length    = idx + 1
 
         print("- done.")
         return bucketed_dataset
