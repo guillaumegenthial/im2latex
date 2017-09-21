@@ -3,8 +3,11 @@ import tensorflow as tf
 from tensorflow.contrib.rnn import GRUCell, LSTMCell
 
 
+from .components.positional import add_timing_signal_nd
+
+
 class Encoder(object):
-    """Class with a __call__ methods that applies convolutions to an image"""
+    """Class with a __call__ method that applies convolutions to an image"""
 
     def __init__(self, config):
         self.config = config
@@ -51,5 +54,8 @@ class Encoder(object):
             # conv
             out = tf.layers.conv2d(out, 512, 3, 1, "VALID",
                     activation=tf.nn.relu)
+
+            # from tensor2tensor lib - positional embeddings
+            out = add_timing_signal_nd(out)
 
         return out

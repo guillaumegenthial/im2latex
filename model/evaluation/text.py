@@ -31,9 +31,9 @@ def score_files(path_ref, path_hyp):
 
     # score
     return {
-            "BLEU-4": bleu_score(refs, hyps),
-            "EM": exact_match_score(refs, hyps),
-            "Edit": edit_distance(refs, hyps)
+            "BLEU-4": bleu_score(refs, hyps)*100,
+            "EM": exact_match_score(refs, hyps)*100,
+            "Edit": edit_distance(refs, hyps)*100
             }
 
 
