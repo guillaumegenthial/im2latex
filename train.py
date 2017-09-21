@@ -2,6 +2,7 @@ from model.utils.data_generator import DataGenerator
 from model.img2seq import Img2SeqModel
 from model.configs.config import Config
 from model.configs.small import Small
+from model.configs.restore import Restore
 from model.utils.preprocess import greyscale, get_form_prepro
 from model.utils.lr_schedule import LRSchedule
 

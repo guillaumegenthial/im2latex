@@ -139,8 +139,8 @@ class Img2SeqModel(BaseModel):
             # update step
             _, loss_eval, summary = self.sess.run(
                     [self.train_op, self.loss, self.merged], feed_dict=fd)
-            prog.update(i + 1, [("loss", loss_eval), ("perplexity",
-                    np.exp(loss_eval))])
+            prog.update(i + 1, [("loss", loss_eval), ("perp",
+                    np.exp(loss_eval)), ("lr", lr_schedule.lr)])
 
              # tensorboard
             if i % 10 == 0:
