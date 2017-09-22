@@ -1,6 +1,9 @@
 {
     "export_name": "model.json",
 
+    "encoder_cnn": "vanilla",
+    "positional_embeddings": true,
+
     "attn_cell_config": {
         "cell_type": "lstm",
         "num_units": 512,

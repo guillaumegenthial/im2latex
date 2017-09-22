@@ -9,8 +9,8 @@ from model.utils.images import greyscale
 if __name__ == "__main__":
     # Load configs
     dir_output = "results/small/"
-    config = Config(["configs/small_data.json", "configs/small_vocab.json",
-                     "configs/small_training.json", "configs/model.json"])
+    config = Config(["configs/data_small.json", "configs/vocab_small.json",
+                     "configs/training_small.json", "configs/model.json"])
     config.save(dir_output)
     vocab = Vocab(config)
 

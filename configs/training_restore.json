@@ -1,8 +1,9 @@
 {
-    "export_name": "training.json",
+    "export_name": "training_restore.json",
+
     "lr_method"    : "Adam",
     "n_epochs"     : 2,
-    "batch_size"   : 3,
+    "batch_size"   : 20,
     "dropout"      : 1,
     "metric_val"   : "perplexity",
     "clip"         : -1,

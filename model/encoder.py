@@ -45,17 +45,25 @@ class Encoder(object):
             out = tf.layers.conv2d(out, 256, 3, 1, "SAME",
                     activation=tf.nn.relu)
 
+            if self._config.encoder_cnn == "vanilla":
+                out = tf.layers.max_pooling2d(out, (2, 1), (2, 1), "SAME")
+
             out = tf.layers.conv2d(out, 512, 3, 1, "SAME",
                     activation=tf.nn.relu)
 
-            # conv with stride /2 (replaces the 2 max pool + adds more params)
-            out = tf.layers.conv2d(out, 512, (2, 4), 2, "SAME")
+            if self._config.encoder_cnn == "vanilla":
+                out = tf.layers.max_pooling2d(out, (1, 2), (1, 2), "SAME")
+
+            if self._config.encoder_cnn == "cnn":
+                # conv with stride /2 (replaces the 2 max pool)
+                out = tf.layers.conv2d(out, 512, (2, 4), 2, "SAME")
 
             # conv
             out = tf.layers.conv2d(out, 512, 3, 1, "VALID",
                     activation=tf.nn.relu)
 
-            # from tensor2tensor lib - positional embeddings
-            out = add_timing_signal_nd(out)
+            if self._config.positional_embeddings:
+                # from tensor2tensor lib - positional embeddings
+                out = add_timing_signal_nd(out)
 
         return out
