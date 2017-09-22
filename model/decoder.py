@@ -15,8 +15,10 @@ from components.beam_search_decoder_cell import BeamSearchDecoderCell
 class Decoder(object):
     """Implements this paper https://arxiv.org/pdf/1609.04938.pdf"""
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, config, n_tok, id_end):
+        self._config = config
+        self._n_tok = n_tok
+        self._id_end = id_end
         self._tiles = 1 if config.decoding == "greedy" else config.beam_size
 
 
@@ -35,9 +37,9 @@ class Decoder(object):
                 - pred.test.ids, shape = (?, config.max_length_formula)
 
         """
-        dim_embeddings = self.config.attn_cell_config.get("dim_embeddings")
+        dim_embeddings = self._config.attn_cell_config.get("dim_embeddings")
         E = tf.get_variable("E", initializer=embedding_initializer(),
-                shape=[self.config.n_tok, dim_embeddings], dtype=tf.float32)
+                shape=[self._n_tok, dim_embeddings], dtype=tf.float32)
 
         start_token = tf.get_variable("start_token", dtype=tf.float32,
                 shape=[dim_embeddings], initializer=embedding_initializer())
@@ -49,10 +51,10 @@ class Decoder(object):
             embeddings = get_embeddings(formula, E, dim_embeddings,
                     start_token, batch_size)
             attn_meca = AttentionMechanism(img,
-                    self.config.attn_cell_config["dim_e"])
-            recu_cell = LSTMCell(self.config.attn_cell_config["num_units"])
+                    self._config.attn_cell_config["dim_e"])
+            recu_cell = LSTMCell(self._config.attn_cell_config["num_units"])
             attn_cell = AttentionCell(recu_cell, attn_meca, dropout,
-                    self.config.attn_cell_config)
+                    self._config.attn_cell_config, self._n_tok)
 
             train_outputs, _ = tf.nn.dynamic_rnn(attn_cell, embeddings,
                     initial_state=attn_cell.initial_state())
@@ -60,22 +62,22 @@ class Decoder(object):
         # decoding
         with tf.variable_scope("attn_cell", reuse=True):
             attn_meca = AttentionMechanism(img=img,
-                    dim_e=self.config.attn_cell_config["dim_e"],
+                    dim_e=self._config.attn_cell_config["dim_e"],
                     tiles=self._tiles)
-            recu_cell = LSTMCell(self.config.attn_cell_config["num_units"],
+            recu_cell = LSTMCell(self._config.attn_cell_config["num_units"],
                     reuse=True)
             attn_cell = AttentionCell(recu_cell, attn_meca, dropout,
-                    self.config.attn_cell_config)
-            decoder_cell = get_decoder_cell(self.config, E, attn_cell,
-                    batch_size, start_token)
+                    self._config.attn_cell_config, self._n_tok)
+            decoder_cell = get_decoder_cell(self._config, E, attn_cell,
+                    batch_size, start_token, self._id_end)
 
             test_outputs, _ = dynamic_decode(decoder_cell,
-                    self.config.max_length_formula+1)
+                    self._config.max_length_formula+1)
 
         return train_outputs, test_outputs
 
 
-def get_decoder_cell(config, E, attn_cell, batch_size, start_token):
+def get_decoder_cell(config, E, attn_cell, batch_size, start_token, id_end):
     """Returns the cell given a config
 
     Args:
@@ -90,10 +92,10 @@ def get_decoder_cell(config, E, attn_cell, batch_size, start_token):
     """
     if config.decoding == "greedy":
         decoder_cell = GreedyDecoderCell(E, attn_cell, batch_size, start_token,
-                config.id_END)
+                id_end)
     elif config.decoding == "beam_search":
         decoder_cell = BeamSearchDecoderCell(E, attn_cell, batch_size,
-                start_token, config.beam_size, config.id_END)
+                start_token, config.beam_size, id_end)
     else:
         raise NotImplementedError
 

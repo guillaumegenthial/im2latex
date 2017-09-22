@@ -10,7 +10,7 @@ class Encoder(object):
     """Class with a __call__ method that applies convolutions to an image"""
 
     def __init__(self, config):
-        self.config = config
+        self._config = config
 
 
     def __call__(self, training, img, dropout):

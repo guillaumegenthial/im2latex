@@ -6,10 +6,62 @@ from PIL import Image
 from multiprocessing import Pool
 
 
-from .general import run, get_files, delete_file
+from .general import run, get_files, delete_file, init_dir
 
 
 TIMEOUT = 10
+
+
+def get_max_shape(arrays):
+    """
+    Args:
+        images: list of arrays
+
+    """
+    shapes = map(lambda x: list(x.shape), arrays)
+    ndim = len(arrays[0].shape)
+    max_shape = []
+    for d in range(ndim):
+        max_shape += [max(shapes, key=lambda x: x[d])[d]]
+
+    return max_shape
+
+
+def pad_batch_images(images, max_shape=None):
+    """
+    Args:
+        images: list of arrays
+        target_shape: shape at which we want to pad
+
+    """
+
+    # 1. max shape
+    if max_shape is None:
+        max_shape = get_max_shape(images)
+
+    # 2. apply formating
+    batch_images = 255 * np.ones([len(images)] + list(max_shape))
+    for idx, img in enumerate(images):
+        batch_images[idx, :img.shape[0], :img.shape[1]] = img
+
+    return batch_images.astype(np.uint8)
+
+
+def greyscale(state):
+    """Preprocess state (:, :, 3) image into greyscale"""
+    state = state[:, :, 0]*0.299 + state[:, :, 1]*0.587 + state[:, :, 2]*0.114
+    state = state[:, :, np.newaxis]
+    return state.astype(np.uint8)
+
+
+def downsample(state):
+    """Downsamples an image on the first 2 dimensions
+
+    Args:
+        state: (np array) with 3 dimensions
+
+    """
+    return state[::2, ::2, :]
 
 
 def pad_image(img, output_path, pad_size=[8,8,8,8], buckets=None):
@@ -166,6 +218,7 @@ def build_images(formulas, dir_images, quality=100, density=200, down_ratio=2,
         list of (path_img, idx). If an exception was raised during the image
             generation, path_img = False
     """
+    init_dir(dir_images)
     existing_idx = sorted(set([int(file_name.split('.')[0]) for file_name in
             get_files(dir_images) if file_name.split('.')[-1] == "png"]))
 

@@ -1,36 +1,44 @@
-from model.configs.config import Config
-from model.img2seq import Img2SeqModel
 from model.utils.data_generator import DataGenerator
-from model.utils.preprocess import greyscale, get_form_prepro
-from model.utils.images import build_images
-from model.utils.data import load_formulas
+from model.img2seq import Img2SeqModel
+from model.utils.general import Config
+from model.utils.text import Vocab, load_formulas
+from model.utils.images import greyscale, build_images
+
 from model.evaluation.text import score_files
 from model.evaluation.image import score_dirs
 
 
 if __name__ == "__main__":
-    # restore model
-    config = Config()
-    config.restore_from_dir("results/small/")
-    model = Img2SeqModel(config)
-    model.build()
-    model.restore_session(config.dir_model)
+    # restore config and model
+    dir_output = "results/small/"
+
+    config_data  = Config(dir_output + "data.json")
+    config_vocab = Config(dir_output + "vocab.json")
+    config_model = Config(dir_output + "model.json")
+
+    vocab = Vocab(config_vocab)
+    model = Img2SeqModel(config_model, dir_output, vocab)
+    model.build_pred()
+    model.restore_session(dir_output + "model.weights/")
 
     # load dataset
-    test_set = DataGenerator(path_formulas=config.path_formulas_test,
-            dir_images=config.dir_images_test, max_iter=config.max_iter,
-            path_matching=config.path_matching_test, img_prepro=greyscale,
-            form_prepro=get_form_prepro(config.tok_to_id),
-            max_len=config.max_length_formula)
+    test_set = DataGenerator(path_formulas=config_data.path_formulas_test,
+            dir_images=config_data.dir_images_test, img_prepro=greyscale,
+            max_iter=config_data.max_iter, bucket=config_data.bucket_test,
+            path_matching=config_data.path_matching_test,
+            max_len=config_data.max_length_formula,
+            form_prepro=vocab.form_prepro,)
+
 
     # build images from formulas
-    formula_ref = config.dir_formulas_test_result + "ref.txt"
-    formula_hyp = config.dir_formulas_test_result + "hyp_0.txt"
-    build_images(load_formulas(formula_ref), config.dir_images_test_result_ref)
-    build_images(load_formulas(formula_hyp), config.dir_images_test_result_hyp)
+    formula_ref = dir_output + "formulas_test/ref.txt"
+    formula_hyp = dir_output + "formulas_test/hyp_0.txt"
+    images_ref  = dir_output + "images_test/ref/"
+    images_test = dir_output + "images_test/hyp_0/"
+    build_images(load_formulas(formula_ref), images_ref)
+    build_images(load_formulas(formula_hyp), images_test)
 
     # score the repositories
-    scores = score_dirs(config.dir_images_test_result_ref,
-            config.dir_images_test_result_hyp, greyscale)
+    scores = score_dirs(images_ref, images_test, greyscale)
     msg = " - ".join(["{} {:04.2f}".format(k, v) for k, v in scores.items()])
-    config.logger.info("- Eval Img: {}".format(msg))
+    model.logger.info("- Eval Img: {}".format(msg))

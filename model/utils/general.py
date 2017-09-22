@@ -4,9 +4,34 @@ import time
 import logging
 import sys
 import subprocess, shlex
+from shutil import copyfile
+import json
 from threading import Timer
 from os import listdir
 from os.path import isfile, join
+
+
+def minibatches(data_generator, minibatch_size):
+    """
+    Args:
+        data_generator: generator of (img, formulas) tuples
+        minibatch_size: (int)
+
+    Returns:
+        list of tuples
+
+    """
+    x_batch, y_batch = [], []
+    for (x, y) in data_generator:
+        if len(x_batch) == minibatch_size:
+            yield x_batch, y_batch
+            x_batch, y_batch = [], []
+
+        x_batch += [x]
+        y_batch += [y]
+
+    if len(x_batch) != 0:
+        yield x_batch, y_batch
 
 
 def run(cmd, timeout_sec):
@@ -57,6 +82,41 @@ def delete_file(path_file):
         os.remove(path_file)
     except Exception:
         pass
+
+
+class Config():
+    """Class that loads hyperparameters from json file into attributes"""
+
+    def __init__(self, source):
+        """
+        Args:
+            source: path to json file or dict
+        """
+        self.source = source
+
+        if type(source) is dict:
+            self.__dict__.update(source)
+        elif type(source) is str:
+            self.load_json(source)
+        elif type(source) is list:
+            for s in source:
+                self.load_json(s)
+
+
+    def load_json(self, source):
+        with open(source) as f:
+            data = json.load(f)
+            self.__dict__.update(data)
+
+
+    def save(self, dir_name):
+        init_dir(dir_name)
+        if type(self.source) is str:
+            copyfile(self.source, dir_name + self.export_name)
+        elif type(self.source) is list:
+            for s in self.source:
+                c = Config(s)
+                c.save(dir_name)
 
 
 class Progbar(object):

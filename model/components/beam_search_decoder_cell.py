@@ -17,7 +17,7 @@ class BeamSearchDecoderCellState(collections.namedtuple(
     log_probs: shape = [batch_size, beam_size]
         log_probs of the hypotheses
     finished: shape = [batch_size, beam_size]
-        boolean to know if one beam hypothesis has reached token id_END
+        boolean to know if one beam hypothesis has reached token id_end
 
     """
     pass

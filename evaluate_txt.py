@@ -1,8 +1,9 @@
-from model.configs.config import Config
-from model.img2seq import Img2SeqModel
 from model.utils.data_generator import DataGenerator
-from model.utils.preprocess import greyscale, get_form_prepro
-from model.utils.images import build_images
+from model.img2seq import Img2SeqModel
+from model.utils.general import Config
+from model.utils.text import Vocab
+from model.utils.images import greyscale
+
 from model.utils.data import load_formulas
 from model.evaluation.text import score_files
 from model.evaluation.image import score_dirs
@@ -10,28 +11,33 @@ from model.evaluation.image import score_dirs
 
 if __name__ == "__main__":
     # restore config and model
-    config = Config()
-    config.restore_from_dir("results/small/")
+    dir_output = "results/small/"
 
-    model = Img2SeqModel(config)
-    model.build()
-    model.restore_session(config.dir_model)
+    config_data  = Config(dir_output + "data.json")
+    config_vocab = Config(dir_output + "vocab.json")
+    config_model = Config(dir_output + "model.json")
+
+    vocab = Vocab(config_vocab)
+    model = Img2SeqModel(config_model, dir_output, vocab)
+    model.build_pred()
+    model.restore_session(dir_output + "model.weights/")
 
     # load dataset
-    test_set = DataGenerator(path_formulas=config.path_formulas_test,
-            dir_images=config.dir_images_test, max_iter=config.max_iter,
-            path_matching=config.path_matching_test, img_prepro=greyscale,
-            form_prepro=get_form_prepro(config.tok_to_id),
-            max_len=config.max_length_formula)
+    test_set = DataGenerator(path_formulas=config_data.path_formulas_test,
+            dir_images=config_data.dir_images_test, img_prepro=greyscale,
+            max_iter=config_data.max_iter, bucket=config_data.bucket_test,
+            path_matching=config_data.path_matching_test,
+            max_len=config_data.max_length_formula,
+            form_prepro=vocab.form_prepro,)
 
     # use model to write predictions in files
-    files, perplexity = model.write_prediction(test_set,
-            params={"dir_name": config.dir_formulas_test_result})
-    formula_ref = config.dir_formulas_test_result + "ref.txt"
-    formula_hyp = config.dir_formulas_test_result + "hyp_0.txt"
+    config_eval = Config({"dir_answers": dir_output + "formulas_test/",
+            "batch_size": 20})
+    files, perplexity = model.write_prediction(config_eval, test_set)
+    formula_ref, formula_hyp = files[0], files[1]
 
     # score the ref and prediction files
     scores = score_files(formula_ref, formula_hyp)
     scores["perplexity"] = perplexity
     msg = " - ".join(["{} {:04.2f}".format(k, v) for k, v in scores.items()])
-    config.logger.info("- Eval Txt: {}".format(msg))
+    model.logger.info("- Test Txt: {}".format(msg))

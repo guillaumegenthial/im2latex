@@ -4,26 +4,28 @@ import time
 import tensorflow as tf
 
 
-from .utils.general import init_dir
+from .utils.general import init_dir, get_logger
 
 
 class BaseModel(object):
     """Generic class for tf models"""
 
-    def __init__(self, config):
-        """Defines self.config and extract logger in self.logger
+    def __init__(self, config, dir_output):
+        """Defines self._config
 
         Args:
             config: (Config instance) class with hyper parameters,
                 vocab and embeddings
 
         """
-        self.config = config
-        self.logger = config.logger
+        self._config = config
+        self._dir_output = dir_output
+        init_dir(self._dir_output)
+        self.logger = get_logger(self._dir_output + "model.log")
         tf.reset_default_graph() # saveguard if previous model was defined
 
 
-    def build(self):
+    def build_train(self, config=None):
         """To overwrite with model-specific logic
 
         This logic must define
@@ -31,6 +33,10 @@ class BaseModel(object):
             - self.lr
             - etc.
         """
+        raise NotImplementedError
+
+    def build_pred(self, config=None):
+        """Similar to build_train but no need to define train_op"""
         raise NotImplementedError
 
 
@@ -91,7 +97,7 @@ class BaseModel(object):
     def save_session(self):
         """Saves session"""
         # check dir one last time
-        dir_model = self.config.dir_output + "model.weights/"
+        dir_model = self._dir_output + "model.weights/"
         init_dir(dir_model)
 
         # logging
@@ -120,11 +126,11 @@ class BaseModel(object):
 
         """
         self.merged      = tf.summary.merge_all()
-        self.file_writer = tf.summary.FileWriter(self.config.dir_output,
+        self.file_writer = tf.summary.FileWriter(self._dir_output,
                 self.sess.graph)
 
 
-    def train(self, train_set, val_set, lr_schedule):
+    def train(self, config, train_set, val_set, lr_schedule):
         """Global training procedure
 
         Calls method self.run_epoch and saves weights if score improves.
@@ -132,6 +138,7 @@ class BaseModel(object):
         self.run_epoch
 
         Args:
+            config: Config instance contains params as attributes
             train_set: Dataset instance
             val_set: Dataset instance
             lr_schedule: LRSchedule instance that takes care of learning proc
@@ -143,14 +150,14 @@ class BaseModel(object):
         best_score = None
         self._add_summary() # tensorboard
 
-        for epoch in range(self.config.n_epochs):
+        for epoch in range(config.n_epochs):
             # logging
             tic = time.time()
-            self.logger.info("Epoch {:}/{:}".format(epoch+1,
-                    self.config.n_epochs))
+            self.logger.info("Epoch {:}/{:}".format(epoch+1, config.n_epochs))
 
             # epoch
-            score = self._run_epoch(train_set, val_set, epoch, lr_schedule)
+            score = self._run_epoch(config, train_set, val_set, epoch,
+                    lr_schedule)
 
             # save weights if we have new best score on eval
             if best_score is None or score >= best_score:
@@ -170,12 +177,13 @@ class BaseModel(object):
         return best_score
 
 
-    def _run_epoch(train_set, val_set, epoch, lr_schedule):
+    def _run_epoch(config, train_set, val_set, epoch, lr_schedule):
         """Model_specific method to overwrite
 
         Performs an epoch of training
 
         Args:
+            config: Config
             train_set: Dataset instance
             val_set: Dataset instance
             epoch: (int) id of the epoch, starting at 0
@@ -189,14 +197,14 @@ class BaseModel(object):
         raise NotImplementedError
 
 
-    def evaluate(self, test_set, params):
+    def evaluate(self, config, test_set):
         """Evaluates model on test set
 
         Calls method run_evaluate on test_set and takes care of logging
 
         Args:
+            config: Config
             test_set: instance of class Dataset
-            params: (dict)
 
         Return:
             scores: (dict) scores["acc"] = 0.85 for instance
@@ -207,7 +215,7 @@ class BaseModel(object):
         sys.stdout.flush()
 
         # evaluate
-        scores = self._run_evaluate(test_set, params)
+        scores = self._run_evaluate(config, test_set)
 
         # logging
         sys.stdout.write("\r")
@@ -219,14 +227,14 @@ class BaseModel(object):
         return scores
 
 
-    def _run_evaluate(test_set, params):
+    def _run_evaluate(config, test_set):
         """Model-specific method to overwrite
 
         Performs an epoch of evaluation
 
         Args:
+            config: Config
             test_set: Dataset instance
-            params: (dict)
 
         Returns:
             scores: (dict) scores["acc"] = 0.85 for instance

@@ -8,7 +8,7 @@ AttentionState = collections.namedtuple("AttentionState", ("cell_state", "o"))
 
 class AttentionCell(RNNCell):
     def __init__(self, cell, attention_mechanism, dropout, attn_cell_config,
-        dtype=tf.float32):
+        num_proj, dtype=tf.float32):
         """
         Args:
             cell: (RNNCell)
@@ -24,11 +24,11 @@ class AttentionCell(RNNCell):
 
         # hyperparameters and shapes
         self._n_channels     = self._attention_mechanism._n_channels
-        self._dim_e          = attn_cell_config.get("dim_e", 512)
-        self._dim_o          = attn_cell_config.get("dim_o", 512)
-        self._num_units      = attn_cell_config.get("num_units", 512)
-        self._num_proj       = attn_cell_config.get("num_proj", 512)
-        self._dim_embeddings = attn_cell_config.get("dim_embeddings", 80)
+        self._dim_e          = attn_cell_config["dim_e"]
+        self._dim_o          = attn_cell_config["dim_o"]
+        self._num_units      = attn_cell_config["num_units"]
+        self._dim_embeddings = attn_cell_config["dim_embeddings"]
+        self._num_proj       = num_proj
         self._dtype          = dtype
 
         # for RNNCell

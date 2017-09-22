@@ -4,10 +4,10 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
 
-from .utils.general import Progbar
-from .utils.data import minibatches, pad_batch_images, pad_batch_formulas
-from .evaluation.util import write_answers
-from .evaluation.text import score_files
+from .utils.general import Config, Progbar, minibatches
+from .utils.images import pad_batch_images
+from .utils.text import pad_batch_formulas
+from .evaluation.text import score_files, write_answers
 
 
 from .encoder import Encoder
@@ -18,29 +18,42 @@ from .base import BaseModel
 class Img2SeqModel(BaseModel):
     """Specialized class for Img2Seq Model"""
 
-    def build(self):
+    def __init__(self, config, dir_output, vocab):
+        """
+        Args:
+            config: Config instance defining hyperparams
+            vocab: Vocab instance defining useful vocab objects like tok_to_id
+
+        """
+        super(Img2SeqModel, self).__init__(config, dir_output)
+        self._vocab = vocab
+
+
+    def build_train(self, config):
         """Builds model"""
         self.logger.info("Building model...")
 
-        self.encoder = Encoder(self.config)
-        self.decoder = Decoder(self.config)
+        self.encoder = Encoder(self._config)
+        self.decoder = Decoder(self._config, self._vocab.n_tok,
+                self._vocab.id_end)
 
         self._add_placeholders_op()
         self._add_pred_op()
         self._add_loss_op()
 
-        self._add_train_op(self.config.lr_method, self.lr, self.loss,
-                self.config.clip)
+        self._add_train_op(config.lr_method, self.lr, self.loss,
+                config.clip)
         self.init_session()
 
         self.logger.info("- done.")
 
 
-    def build_inference(self):
+    def build_pred(self):
         self.logger.info("Building model...")
 
-        self.encoder = Encoder(self.config)
-        self.decoder = Decoder(self.config)
+        self.encoder = Encoder(self._config)
+        self.decoder = Decoder(self._config, self._vocab.n_tok,
+                self._vocab.id_end)
 
         self._add_placeholders_op()
         self._add_pred_op()
@@ -88,7 +101,7 @@ class Img2SeqModel(BaseModel):
 
         if formula is not None:
             formula, formula_length = pad_batch_formulas(formula,
-                    self.config.id_PAD, self.config.id_END)
+                    self._vocab.id_pad, self._vocab.id_end)
             # print img.shape, formula.shape
             fd[self.formula] = formula
             fd[self.formula_length] = formula_length
@@ -128,10 +141,11 @@ class Img2SeqModel(BaseModel):
 
 
 
-    def _run_epoch(self, train_set, val_set, epoch, lr_schedule):
+    def _run_epoch(self, config, train_set, val_set, epoch, lr_schedule):
         """Performs an epoch of training
 
         Args:
+            config: Config instance
             train_set: Dataset instance
             val_set: Dataset instance
             epoch: (int) id of the epoch, starting at 0
@@ -143,7 +157,7 @@ class Img2SeqModel(BaseModel):
 
         """
         # logging
-        batch_size = self.config.batch_size
+        batch_size = config.batch_size
         nbatches = (len(train_set) + batch_size - 1) // batch_size
         prog = Progbar(nbatches)
 
@@ -151,7 +165,7 @@ class Img2SeqModel(BaseModel):
         for i, (img, formula) in enumerate(minibatches(train_set, batch_size)):
             # get feed dict
             fd = self._get_feed_dict(img, training=True, formula=formula,
-                    lr=lr_schedule.lr, dropout=self.config.dropout)
+                    lr=lr_schedule.lr, dropout=config.dropout)
 
             # update step
             _, loss_eval, summary = self.sess.run(
@@ -170,47 +184,47 @@ class Img2SeqModel(BaseModel):
         self.logger.info("- Training: {}".format(prog.info))
 
         # evaluation
-        scores = self.evaluate(val_set,
-                {"dir_name": self.dir_output + "formulas_val/"})
-        score = scores[self.config.metric_val]
+        config_eval = Config({"dir_answers": self._dir_output + "formulas_val/",
+                "batch_size": config.batch_size})
+        scores = self.evaluate(config_eval, val_set)
+        score = scores[config.metric_val]
         lr_schedule.update(score=score)
 
         return score
 
 
 
-    def write_prediction(self, test_set, params):
+    def write_prediction(self, config, test_set):
         """Performs an epoch of evaluation
 
         Args:
-            test_set: Dataset instance
-            params: (dict) with extra params in it
-                - "dir_name": (string)
+            config: (Config) with batch_size and dir_answers
+            test_set:(Dataset) instance
 
         Returns:
-            files: list of path to files
+            files: (list) of path to files
             perp: (float) perplexity on test set
 
         """
         # initialize containers of references and predictions
-        if self.config.decoding == "greedy":
+        if self._config.decoding == "greedy":
             refs, hyps = [], [[]]
-        elif self.config.decoding == "beam_search":
-            refs, hyps = [], [[] for i in range(self.config.beam_size)]
+        elif self._config.decoding == "beam_search":
+            refs, hyps = [], [[] for i in range(self._config.beam_size)]
 
         # iterate over the dataset
         n_words, ce_words = 0, 0 # sum of ce for all words + nb of words
-        for img, formula in minibatches(test_set, self.config.batch_size):
+        for img, formula in minibatches(test_set, config.batch_size):
             fd = self._get_feed_dict(img, training=False, formula=formula,
                     dropout=1)
             ce_words_eval, n_words_eval, ids_eval = self.sess.run(
                     [self.ce_words, self.n_words, self.pred_test.ids],
                     feed_dict=fd)
 
-            if self.config.decoding == "greedy":
+            if self._config.decoding == "greedy":
                 ids_eval = np.expand_dims(ids_eval, axis=1)
 
-            elif self.config.decoding == "beam_search":
+            elif self._config.decoding == "beam_search":
                 ids_eval = np.transpose(ids_eval, [0, 2, 1])
 
             n_words += n_words_eval
@@ -220,15 +234,15 @@ class Img2SeqModel(BaseModel):
                 for i, pred in enumerate(preds):
                     hyps[i].append(pred)
 
-        files = write_answers(refs, hyps, self.config.id_to_tok,
-                params["dir_name"], self.config.id_END)
+        files = write_answers(refs, hyps, self._vocab.id_to_tok,
+                config.dir_answers, self._vocab.id_end)
 
         perp = - np.exp(ce_words / float(n_words))
 
         return files, perp
 
 
-    def _run_evaluate(self, test_set, params):
+    def _run_evaluate(self, config, test_set):
         """Performs an epoch of evaluation
 
         Args:
@@ -240,7 +254,7 @@ class Img2SeqModel(BaseModel):
             scores: (dict) scores["acc"] = 0.85 for instance
 
         """
-        files, perp = self.write_prediction(test_set, params)
+        files, perp = self.write_prediction(config, test_set)
         scores = score_files(files[0], files[1])
         scores["perplexity"] = perp
 

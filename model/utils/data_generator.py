@@ -4,10 +4,8 @@ import numpy as np
 from scipy.misc import imread
 
 
-from .preprocess import greyscale, get_form_prepro
-from .data import minibatches, pad_batch_images, pad_batch_formulas, render, \
-    load_formulas
-from .images import build_images
+from .text import load_formulas
+from .images import build_images, greyscale
 from .general import init_dir
 
 

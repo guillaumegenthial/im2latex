@@ -1,14 +1,15 @@
 {
+    "export_name": "model.json",
+
     "attn_cell_config": {
         "cell_type": "lstm",
         "num_units": 512,
         "dim_e"    : 512,
         "dim_o"    : 512,
-        "num_proj" : null,
         "dim_embeddings": 80
     },
 
     "decoding": "beam_search",
     "beam_size": 5,
-    "max_length_formula": 50,
+    "max_length_formula": 50
 }

@@ -1,4 +1,6 @@
 {
+    "export_name": "training.json",
+
     "lr_method"    : "Adam",
     "n_epochs"     : 15,
     "batch_size"   : 20,
