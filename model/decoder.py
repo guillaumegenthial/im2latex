@@ -44,7 +44,7 @@ class Decoder(object):
         start_token = tf.get_variable("start_token", dtype=tf.float32,
                 shape=[dim_embeddings], initializer=embedding_initializer())
 
-        batch_size = tf.shape(formula)[0]
+        batch_size = tf.shape(img)[0]
 
         # training
         with tf.variable_scope("attn_cell", reuse=False):

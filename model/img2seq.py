@@ -7,7 +7,7 @@ import tensorflow.contrib.layers as layers
 from .utils.general import Config, Progbar, minibatches
 from .utils.images import pad_batch_images
 from .utils.text import pad_batch_formulas
-from .evaluation.text import score_files, write_answers
+from .evaluation.text import score_files, write_answers, truncate_end
 
 
 from .encoder import Encoder
@@ -259,3 +259,37 @@ class Img2SeqModel(BaseModel):
         scores["perplexity"] = perp
 
         return scores
+
+
+    def predict_batch(self, images):
+        if self._config.decoding == "greedy":
+            hyps = [[]]
+        elif self._config.decoding == "beam_search":
+            hyps = [[] for i in range(self._config.beam_size)]
+
+        fd = self._get_feed_dict(images, training=False, dropout=1)
+        ids_eval, = self.sess.run([self.pred_test.ids], feed_dict=fd)
+
+        if self._config.decoding == "greedy":
+            ids_eval = np.expand_dims(ids_eval, axis=1)
+
+        elif self._config.decoding == "beam_search":
+            ids_eval = np.transpose(ids_eval, [0, 2, 1])
+
+        for preds in ids_eval:
+            for i, pred in enumerate(preds):
+                p = truncate_end(pred, self._vocab.id_end)
+                p = " ".join([self._vocab.id_to_tok[idx] for idx in p])
+                hyps[i].append(p)
+
+        return hyps
+
+
+    def predict(self, img):
+        preds = self.predict_batch([img])
+        preds_ = []
+        # extract only one element (no batch)
+        for hyp in preds:
+            preds_.append(hyp[0])
+
+        return preds_
