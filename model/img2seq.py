@@ -5,7 +5,7 @@ import tensorflow.contrib.layers as layers
 
 
 from .utils.general import Config, Progbar, minibatches
-from .utils.images import pad_batch_images
+from .utils.image import pad_batch_images
 from .utils.text import pad_batch_formulas
 from .evaluation.text import score_files, write_answers, truncate_end
 
@@ -168,14 +168,10 @@ class Img2SeqModel(BaseModel):
                     lr=lr_schedule.lr, dropout=config.dropout)
 
             # update step
-            _, loss_eval, summary = self.sess.run(
-                    [self.train_op, self.loss, self.merged], feed_dict=fd)
+            _, loss_eval = self.sess.run([self.train_op, self.loss],
+                    feed_dict=fd)
             prog.update(i + 1, [("loss", loss_eval), ("perplexity",
                     np.exp(loss_eval)), ("lr", lr_schedule.lr)])
-
-            # tensorboard
-            if i % 10 == 0:
-                self.file_writer.add_summary(summary, epoch*nbatches + i)
 
             # update learning rate
             lr_schedule.update(batch_no=epoch*nbatches + i)

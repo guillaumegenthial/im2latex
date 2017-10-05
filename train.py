@@ -3,14 +3,14 @@ from model.img2seq import Img2SeqModel
 from model.utils.lr_schedule import LRSchedule
 from model.utils.general import Config
 from model.utils.text import Vocab
-from model.utils.images import greyscale
+from model.utils.image import greyscale
 
 
-if __name__ == "__main__":
+def main():
     # Load configs
-    dir_output = "results/under_50_vanilla_positional/"
-    config = Config(["configs/data.json", "configs/vocab.json",
-                     "configs/training.json", "configs/model.json"])
+    dir_output = "results/small/"
+    config = Config(["configs/data_small.json", "configs/vocab_small.json",
+                     "configs/training_small.json", "configs/model.json"])
     config.save(dir_output)
     vocab = Vocab(config)
 
@@ -42,3 +42,7 @@ if __name__ == "__main__":
     model = Img2SeqModel(config, dir_output, vocab)
     model.build_train(config)
     model.train(config, train_set, val_set, lr_schedule)
+
+
+if __name__ == "__main__":
+    main()

@@ -35,6 +35,7 @@ class BaseModel(object):
         """
         raise NotImplementedError
 
+
     def build_pred(self, config=None):
         """Similar to build_train but no need to define train_op"""
         raise NotImplementedError
@@ -148,7 +149,6 @@ class BaseModel(object):
 
         """
         best_score = None
-        self._add_summary() # tensorboard
 
         for epoch in range(config.n_epochs):
             # logging

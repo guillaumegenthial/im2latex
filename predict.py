@@ -5,9 +5,10 @@ from PIL import Image
 
 from model.utils.data_generator import DataGenerator
 from model.img2seq import Img2SeqModel
-from model.utils.general import Config
+from model.utils.general import Config, run
 from model.utils.text import Vocab
-from model.utils.images import greyscale
+from model.utils.image import greyscale, crop_image, pad_image, \
+    downsample_image, TIMEOUT
 
 from model.utils.data import load_formulas
 from model.evaluation.text import score_files
@@ -36,17 +37,30 @@ input> data/images_test/0.png""")
         if img_path == "exit":
             break
 
+        if img_path[-3:] == "png":
+            img = imread(img_path)
 
-        old_im = Image.open(img_path)
-        old_size = old_im.size
-        target = 280
-        ratio = old_size[0] / target
-        # new_size = (target, int(old_size[1]/ratio))
-        new_size = (280, 40)
-        new_im = old_im.resize(new_size, PIL.Image.LANCZOS)
-        new_im.save("temp.png")
+        elif img_path[-3:] == "pdf":
+            # call magick to convert the pdf into a png file
+            buckets = [
+            [240, 100], [320, 80], [400, 80], [400, 100], [480, 80], [480, 100],
+            [560, 80], [560, 100], [640, 80], [640, 100], [720, 80], [720, 100],
+            [720, 120], [720, 200], [800, 100], [800, 320], [1000, 200],
+            [1000, 400], [1200, 200], [1600, 200], [1600, 1600]
+            ]
 
-        img = imread("temp.png")
+            dir_output = "tmp/"
+            name = img_path.split('/')[-1].split('.')[0]
+            run("magick convert -density {} -quality {} {} {}".format(200, 100,
+                img_path, dir_output+"{}.png".format(name)), TIMEOUT)
+            img_path = dir_output + "{}.png".format(name)
+            crop_image(img_path, img_path)
+            pad_image(img_path, img_path, buckets=buckets)
+            downsample_image(img_path, img_path, 2)
+
+            img = imread(img_path)
+
+
         img = greyscale(img)
         hyps = model.predict(img)
 
@@ -55,7 +69,7 @@ input> data/images_test/0.png""")
 
 if __name__ == "__main__":
     # restore config and model
-    dir_output = "results/google/under_50_beam_5_cnn_positional/"
+    dir_output = "results/google/under_50_vanilla_positional/"
     config_vocab = Config(dir_output + "vocab.json")
     config_model = Config(dir_output + "model.json")
     vocab = Vocab(config_vocab)

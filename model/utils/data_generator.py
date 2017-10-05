@@ -5,7 +5,7 @@ from scipy.misc import imread
 
 
 from .text import load_formulas
-from .images import build_images, greyscale
+from .image import build_images, greyscale
 from .general import init_dir
 
 

@@ -2,6 +2,8 @@ import tensorflow as tf
 import collections
 from tensorflow.python.util import nest
 from tensorflow.contrib.rnn import RNNCell
+
+
 from dynamic_decode import transpose_batch_time
 from greedy_decoder_cell import DecoderOutput
 
@@ -330,7 +332,7 @@ def gather_helper(t, indices, batch_size, beam_size):
         new_t: tensor w shape as t but new_t[:, i] = t[:, new_parents[:, i]]
 
     """
-    range_  = tf.expand_dims(tf.range(batch_size) * beam_size, axis=1);
+    range_  = tf.expand_dims(tf.range(batch_size) * beam_size, axis=1)
     indices = tf.reshape(indices + range_, [-1])
     output  = tf.gather(
         tf.reshape(t, [batch_size*beam_size, -1]),
