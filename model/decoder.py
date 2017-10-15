@@ -68,38 +68,18 @@ class Decoder(object):
                     reuse=True)
             attn_cell = AttentionCell(recu_cell, attn_meca, dropout,
                     self._config.attn_cell_config, self._n_tok)
-            decoder_cell = get_decoder_cell(self._config, E, attn_cell,
-                    batch_size, start_token, self._id_end)
+            if self._config.decoding == "greedy":
+                decoder_cell = GreedyDecoderCell(E, attn_cell, batch_size,
+                        start_token, id_end)
+            elif self._config.decoding == "beam_search":
+                decoder_cell = BeamSearchDecoderCell(E, attn_cell, batch_size,
+                        start_token, self._id_end, self._config.beam_size,
+                        self._config.div_gamma, self._config.div_prob)
 
             test_outputs, _ = dynamic_decode(decoder_cell,
                     self._config.max_length_formula+1)
 
         return train_outputs, test_outputs
-
-
-def get_decoder_cell(config, E, attn_cell, batch_size, start_token, id_end):
-    """Returns the cell given a config
-
-    Args:
-        config: Config() instance
-        att_cell: AttentionCell instance
-        batch_size: shape
-        start_token: embedding of the start token
-
-    Returns:
-        decoder_cell: instance of decoder cell
-
-    """
-    if config.decoding == "greedy":
-        decoder_cell = GreedyDecoderCell(E, attn_cell, batch_size, start_token,
-                id_end)
-    elif config.decoding == "beam_search":
-        decoder_cell = BeamSearchDecoderCell(E, attn_cell, batch_size,
-                start_token, config.beam_size, id_end)
-    else:
-        raise NotImplementedError
-
-    return decoder_cell
 
 
 def get_embeddings(formula, E, dim, start_token, batch_size):

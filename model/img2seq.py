@@ -64,6 +64,7 @@ class Img2SeqModel(BaseModel):
         self.logger.info("- done.")
 
 
+
     def _add_placeholders_op(self):
         """
         Add placeholder attributes
@@ -217,6 +218,7 @@ class Img2SeqModel(BaseModel):
                     [self.ce_words, self.n_words, self.pred_test.ids],
                     feed_dict=fd)
 
+            # TODO(guillaume): move this logic into tf graph
             if self._config.decoding == "greedy":
                 ids_eval = np.expand_dims(ids_eval, axis=1)
 

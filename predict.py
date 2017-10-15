@@ -3,16 +3,12 @@ import PIL
 from PIL import Image
 
 
-from model.utils.data_generator import DataGenerator
 from model.img2seq import Img2SeqModel
 from model.utils.general import Config, run
 from model.utils.text import Vocab
 from model.utils.image import greyscale, crop_image, pad_image, \
     downsample_image, TIMEOUT
 
-from model.utils.data import load_formulas
-from model.evaluation.text import score_files
-from model.evaluation.image import score_dirs
 
 
 def interactive_shell(model):

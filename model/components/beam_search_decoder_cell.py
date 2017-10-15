@@ -42,8 +42,24 @@ class BeamSearchDecoderOutput(collections.namedtuple(
 
 class BeamSearchDecoderCell(object):
 
-    def __init__(self, embeddings, cell, batch_size, start_token, beam_size,
-        end_token):
+    def __init__(self, embeddings, cell, batch_size, start_token, end_token,
+            beam_size=5, div_gamma=0.5, div_prob=0.3):
+        """Initializes parameters for Beam Search
+
+        Args:
+            embeddings: (tf.Variable) shape = (vocab_size, embedding_size)
+            cell: instance of Cell that defines a step function, etc.
+            batch_size: tf.int extracted with tf.Shape or int
+            start_token: id of start token
+            end_token: int, id of the end token
+            beam_size: int, size of the beam
+            div_gamma: float, amount of penalty to add to beam hypo for
+                diversity. Coefficient of penaly will be log(div_gamma).
+                Use value between 0 and 1. (1 means no penalty)
+            div_prob: only apply div penalty with probability div_prob.
+                div_prob = 0. means never apply penalty
+
+        """
 
         self._embeddings = embeddings
         self._cell = cell
@@ -53,6 +69,8 @@ class BeamSearchDecoderCell(object):
         self._beam_size  = beam_size
         self._end_token = end_token
         self._vocab_size = embeddings.shape[0].value
+        self._div_gamma = div_gamma
+        self._div_prob = div_prob
 
 
     @property
@@ -138,11 +156,14 @@ class BeamSearchDecoderCell(object):
         step_log_probs = mask_probs(step_log_probs, self._end_token, finished)
         # shape = [batch_size, beam_size, vocab_size]
         log_probs = tf.expand_dims(state.log_probs, axis=-1) + step_log_probs
+        log_probs = add_div_penalty(log_probs, self._div_gamma, self._div_prob,
+                self._batch_size, self._beam_size, self._vocab_size)
 
         # compute the best beams
         # shape =  (batch_size, beam_size * vocab_size)
         log_probs_flat = tf.reshape(log_probs,
                 [self._batch_size, self._beam_size * self._vocab_size])
+        # if time = 0, consider only one beam, otherwise beams are equal
         log_probs_flat = tf.cond(time > 0, lambda: log_probs_flat,
                 lambda: log_probs[:, 0])
         new_probs, indices = tf.nn.top_k(log_probs_flat, self._beam_size)
@@ -238,6 +259,43 @@ class BeamSearchDecoderCell(object):
                 final_outputs)
 
         return DecoderOutput(logits=final_outputs.logits, ids=final_outputs.ids)
+
+
+def sample_bernoulli(p, s):
+    """Samples a boolean tensor with shape = s according to bernouilli"""
+    return tf.greater(p, tf.random_uniform(s))
+
+
+def add_div_penalty(log_probs, div_gamma, div_prob, batch_size, beam_size,
+        vocab_size):
+    """Adds penalty to beam hypothesis following this paper by Li et al. 2016
+    "A Simple, Fast Diverse Decoding Algorithm for Neural Generation"
+
+    Args:
+        log_probs: (tensor of floats)
+            shape = (batch_size, beam_size, vocab_size)
+        div_gamma: (float) diversity parameter
+        div_prob: (float) adds penalty with proba div_prob
+
+    """
+    if div_gamma == 1. or div_prob == 0.: return log_probs
+
+    # 1. get indices that would sort the array
+    top_probs, top_inds = tf.nn.top_k(log_probs, k=vocab_size, sorted=True)
+    # 2. inverse permutation to get rank of each entry
+    top_inds = tf.reshape(top_inds, [-1, vocab_size])
+    index_rank = tf.map_fn(tf.invert_permutation, top_inds)
+    index_rank = tf.reshape(index_rank, shape=[batch_size, beam_size,
+            vocab_size])
+    # 3. compute penalty
+    penalties = tf.log(div_gamma) * tf.cast(index_rank, log_probs.dtype)
+    # 4. only apply penalty with some probability
+    apply_penalty = tf.cast(
+            sample_bernoulli(div_prob, [batch_size, beam_size, vocab_size]),
+            penalties.dtype)
+    penalties *= apply_penalty
+
+    return log_probs + penalties
 
 
 def merge_batch_beam(t):

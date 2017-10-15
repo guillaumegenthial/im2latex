@@ -7,7 +7,10 @@ from model.utils.image import greyscale
 from model.utils.data import load_formulas
 from model.evaluation.text import score_files
 
-
+"""
+TODO(guillaume): do hyperparameter search on div_gamma and div_prob.
+Evaluate on validation set with random search on a given grid.
+"""
 if __name__ == "__main__":
     # restore config and model
     dir_output = "results/google/under_50_vanilla_positional/"
@@ -21,9 +24,9 @@ if __name__ == "__main__":
     model.build_pred()
     model.restore_session(dir_output + "model.weights/")
 
-    # custom
-    # config_data.max_iter = 20
-    # dir_output = "tmp/"
+    # special modif
+    config_data.max_iter = 20
+    dir_output = "tmp/"
 
     # load dataset
     test_set = DataGenerator(path_formulas=config_data.path_formulas_test,
