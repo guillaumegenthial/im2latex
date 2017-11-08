@@ -5,7 +5,7 @@ from model.utils.general import Config
 
 
 if __name__ == "__main__":
-    data_config = Config("configs/small_data.json")
+    data_config = Config("configs/data_small.json")
 
     # datasets
     train_set = DataGenerator(
@@ -27,6 +27,6 @@ if __name__ == "__main__":
     val_set.build(buckets=data_config.buckets)
 
     # vocab
-    vocab_config = Config("configs/small_vocab.json")
+    vocab_config = Config("configs/vocab_small.json")
     vocab = build_vocab([train_set], min_count=vocab_config.min_count_tok)
     write_vocab(vocab, vocab_config.path_vocab)

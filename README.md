@@ -2,59 +2,59 @@
 
 ## Install
 
-Install ghostsript and magick (from source depending on your linux distribution) and pdflatex for evaluation
-
-https://www.imagemagick.org/script/install-source.php
-
-
-```
-sudo pip install -r requirements.txt
-sudo apt-get install texlive-latex-base
-sudo apt-get install texlive-latex-extra
-
-sudo apt-get install ghostscript
-sudo apt-get install libgs-dev
-
-wget http://www.imagemagick.org/download/ImageMagick.tar.gz
-tar -xvf ImageMagick.tar.gz
-cd ImageMagick-7.*
-./configure --with-gslib=yes 
-make
-sudo make install
-sudo ldconfig /usr/local/lib
-```
-
-
-## Data and Preprocessing
-
-We use Harvard preprocessing scripts that can be found at http://lstm.seas.harvard.edu/latex/
-
-First, crop + downsampling of images + group by similar shape
+Install pdflatex (latex to pdf) and ghostsript + [magick](https://www.imagemagick.org/script/install-source.php
+) (pdf to png) on Linux
 
 
 ```
-python scripts/preprocessing/preprocess_images.py --input-dir data/formula_images --output-dir data/images_processed
+make install-linux
 ```
 
-Second, parse formulas with KaTeX parser
+(takes a while, installs from source)
+
+On Mac, assuming you already have a LaTeX distribution installed, you should have pdflatex and ghostscript installed, so you just need to install magick. You can try
 
 ```
-python scripts/preprocessing/preprocess_formulas.py --mode normalize --input-file data/im2latex_formulas.lst --output-file data/norm.formulas.lst
+make install-mac
 ```
 
-Third, filter formulas
+## Data
+
+You can download the [prebuilt dataset from Harvard](https://zenodo.org/record/56198#.V2p0KTXT6eA) and use their preprocessing scripts found [here](https://github.com/harvardnlp/im2markup)
+
+
+## Getting Started
+
+We provide a small dataset just to check the pipeline. If you haven't touched the files, run
 
 ```
-python scripts/preprocessing/preprocess_filter.py --filter --image-dir data/images_processed --label-path data/norm.formulas.lst --data-path data/im2latex_train.lst  --output-path data/train_filter.lst
-python scripts/preprocessing/preprocess_filter.py --filter --image-dir data/images_processed --label-path data/norm.formulas.lst --data-path data/im2latex_validate.lst  --output-path data/val_filter.lst
-python scripts/preprocessing/preprocess_filter.py --filter --image-dir data/images_processed --label-path data/norm.formulas.lst --data-path data/im2latex_test.lst  --output-path data/test_filter.lst
+make run
 ```
 
+or perform the following steps
 
-## Train
-
-Edit the config file in configs/
-
+1. Build the images from the formulas, write the matching file and extract the vocabulary. __Run only once__
 ```
-python main.py
+python build.py
 ```
+
+2. Train on this small dataset
+```
+python train.py
+```
+
+3. Evaluate the text metrics
+```
+python evaluate_txt.py
+```
+
+4. Evaluate the image metrics
+```
+python evaluate_img.py
+```
+
+You should observe that the model starts to produce reasonable patterns of LaTeX.
+
+## Config
+
+Edit the config files in configs/ for your needs and change the name of the config files used in `build.py`, `train.py` etc.

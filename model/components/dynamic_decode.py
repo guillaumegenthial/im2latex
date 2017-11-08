@@ -59,7 +59,8 @@ def dynamic_decode(decoder_cell, maximum_iterations):
             condition,
             body,
             loop_vars=[initial_time, initial_outputs_ta, initial_state,
-                       initial_inputs, initial_finished])
+                       initial_inputs, initial_finished],
+            back_prop=False)
 
     # get final outputs and states
     final_outputs_ta, final_state = res[1], res[2]

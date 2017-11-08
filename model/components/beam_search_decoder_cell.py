@@ -249,7 +249,8 @@ class BeamSearchDecoderCell(object):
         res = tf.while_loop(
                 condition,
                 body,
-                loop_vars=[initial_time, initial_outputs_ta, initial_parents])
+                loop_vars=[initial_time, initial_outputs_ta, initial_parents],
+                back_prop=False)
 
         # unfold and stack the structure from the nested tas
         final_outputs = nest.map_structure(lambda ta: ta.stack(), res[1])
@@ -284,7 +285,7 @@ def add_div_penalty(log_probs, div_gamma, div_prob, batch_size, beam_size,
     top_probs, top_inds = tf.nn.top_k(log_probs, k=vocab_size, sorted=True)
     # 2. inverse permutation to get rank of each entry
     top_inds = tf.reshape(top_inds, [-1, vocab_size])
-    index_rank = tf.map_fn(tf.invert_permutation, top_inds)
+    index_rank = tf.map_fn(tf.invert_permutation, top_inds, back_prop=False)
     index_rank = tf.reshape(index_rank, shape=[batch_size, beam_size,
             vocab_size])
     # 3. compute penalty

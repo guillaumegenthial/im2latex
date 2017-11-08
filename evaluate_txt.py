@@ -10,7 +10,7 @@ from model.evaluation.text import score_files
 
 if __name__ == "__main__":
     # restore config and model
-    dir_output = "results/google/under_50_vanilla_positional/"
+    dir_output = "results/small/"
 
     config_data  = Config(dir_output + "data.json")
     config_vocab = Config(dir_output + "vocab.json")
@@ -20,10 +20,6 @@ if __name__ == "__main__":
     model = Img2SeqModel(config_model, dir_output, vocab)
     model.build_pred()
     model.restore_session(dir_output + "model.weights/")
-
-    # custom
-    # config_data.max_iter = 20
-    # dir_output = "tmp/"
 
     # load dataset
     test_set = DataGenerator(path_formulas=config_data.path_formulas_test,
@@ -35,7 +31,7 @@ if __name__ == "__main__":
 
     # use model to write predictions in files
     config_eval = Config({"dir_answers": dir_output + "formulas_test/",
-            "batch_size": 20})
+                          "batch_size": 20})
     files, perplexity = model.write_prediction(config_eval, test_set)
     formula_ref, formula_hyp = files[0], files[1]
 
