@@ -1,4 +1,6 @@
-# Img2Latex
+# Im2Latex
+
+Seq2Seq model with Attention + Beam Search for Image to LaTeX.
 
 ## Install
 
