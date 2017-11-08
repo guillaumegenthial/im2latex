@@ -13,8 +13,6 @@ from model.utils.image import greyscale, crop_image, pad_image, \
 
 def interactive_shell(model):
     """Creates interactive shell to play with model
-    Args:
-        model: instance of NERModel
     """
     model.logger.info("""
 This is an interactive mode.
@@ -65,7 +63,7 @@ input> data/images_test/0.png""")
 
 if __name__ == "__main__":
     # restore config and model
-    dir_output = "results/google/under_50_vanilla_positional/"
+    dir_output = "results/small/"
     config_vocab = Config(dir_output + "vocab.json")
     config_model = Config(dir_output + "model.json")
     vocab = Vocab(config_vocab)
