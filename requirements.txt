@@ -1,5 +1,9 @@
+tensorflow
 numpy
 scipy
-tensorflow
 nltk
+pillow
 distance
+logging
+multiprocessing
+six

@@ -2,6 +2,8 @@
 
 Seq2Seq model with Attention + Beam Search for Image to LaTeX.
 
+[Blog post](https://guillaumegenthial.github.io/image-to-latex.html)
+
 ## Install
 
 Install pdflatex (latex to pdf) and ghostsript + [magick](https://www.imagemagick.org/script/install-source.php
