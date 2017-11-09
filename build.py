@@ -1,11 +1,19 @@
+import click
+
+
 from model.utils.data_generator import DataGenerator
 from model.utils.text import build_vocab, write_vocab
 from model.utils.image import build_images
 from model.utils.general import Config
 
 
-if __name__ == "__main__":
-    data_config = Config("configs/data_small.json")
+@click.command()
+@click.option('--data', default="configs/data_small.json",
+        help='Path to data json config')
+@click.option('--vocab', default="configs/vocab_small.json",
+        help='Path to vocab json config')
+def main(data, vocab):
+    data_config = Config(data)
 
     # datasets
     train_set = DataGenerator(
@@ -27,6 +35,10 @@ if __name__ == "__main__":
     val_set.build(buckets=data_config.buckets)
 
     # vocab
-    vocab_config = Config("configs/vocab_small.json")
+    vocab_config = Config(vocab)
     vocab = build_vocab([train_set], min_count=vocab_config.min_count_tok)
     write_vocab(vocab, vocab_config.path_vocab)
+
+
+if __name__ == "__main__":
+    main()

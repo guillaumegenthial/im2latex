@@ -18,7 +18,7 @@
     "bucket_test": true,
 
     "max_iter"          : null,
-    "max_length_formula": 50,
+    "max_length_formula": 150,
 
     "buckets": [
         [240, 100], [320, 80], [400, 80], [400, 100], [480, 80], [480, 100],

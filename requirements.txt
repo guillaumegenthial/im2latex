@@ -7,3 +7,4 @@ distance
 logging
 multiprocessing
 six
+click

@@ -17,5 +17,5 @@
     "div_gamma": 0.5,
     "div_prob": 0.3,
 
-    "max_length_formula": 50
+    "max_length_formula": 150
 }

@@ -1,3 +1,6 @@
+import click
+
+
 from model.utils.data_generator import DataGenerator
 from model.img2seq import Img2SeqModel
 from model.utils.lr_schedule import LRSchedule
@@ -6,11 +9,21 @@ from model.utils.text import Vocab
 from model.utils.image import greyscale
 
 
-def main():
+@click.command()
+@click.option('--data', default="configs/data_small.json",
+        help='Path to data json config')
+@click.option('--vocab', default="configs/vocab_small.json",
+        help='Path to vocab json config')
+@click.option('--training', default="configs/training_small.json",
+        help='Path to training json config')
+@click.option('--model', default="configs/model.json",
+        help='Path to model json config')
+@click.option('--output', default="results/small/",
+        help='Dir for results and model weights')
+def main(data, vocab, training, model, output):
     # Load configs
-    dir_output = "results/small/"
-    config = Config(["configs/data_small.json", "configs/vocab_small.json",
-                     "configs/training_small.json", "configs/model.json"])
+    dir_output = output
+    config = Config([data, vocab, training, model])
     config.save(dir_output)
     vocab = Vocab(config)
 

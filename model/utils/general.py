@@ -96,11 +96,11 @@ class Config():
 
         if type(source) is dict:
             self.__dict__.update(source)
-        elif type(source) is str:
-            self.load_json(source)
         elif type(source) is list:
             for s in source:
                 self.load_json(s)
+        else:
+            self.load_json(source)
 
 
     def load_json(self, source):
@@ -111,12 +111,14 @@ class Config():
 
     def save(self, dir_name):
         init_dir(dir_name)
-        if type(self.source) is str:
-            copyfile(self.source, dir_name + self.export_name)
-        elif type(self.source) is list:
+        if type(self.source) is list:
             for s in self.source:
                 c = Config(s)
                 c.save(dir_name)
+        elif type(self.source) is dict:
+            json.dumps(self.source, indent=4)
+        else:
+            copyfile(self.source, dir_name + self.export_name)
 
 
 class Progbar(object):

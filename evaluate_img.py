@@ -1,3 +1,6 @@
+import click
+
+
 from model.utils.data_generator import DataGenerator
 from model.img2seq import Img2SeqModel
 from model.utils.general import Config
@@ -8,9 +11,11 @@ from model.evaluation.text import score_files
 from model.evaluation.image import score_dirs
 
 
-if __name__ == "__main__":
+@click.command()
+@click.option('--results', default="results/small/", help='Dir to results')
+def main(results):
     # restore config and model
-    dir_output = "results/small/"
+    dir_output = results
 
     config_data  = Config(dir_output + "data.json")
     config_vocab = Config(dir_output + "vocab.json")
@@ -42,3 +47,7 @@ if __name__ == "__main__":
     scores = score_dirs(images_ref, images_test, greyscale)
     msg = " - ".join(["{} {:04.2f}".format(k, v) for k, v in scores.items()])
     model.logger.info("- Eval Img: {}".format(msg))
+
+
+if __name__ == "__main__":
+    main()
