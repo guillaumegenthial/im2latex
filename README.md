@@ -69,7 +69,8 @@ python build.py --data=configs/data.json --vocab=configs/vocab.json
 
 2. Train
 ```
-python train.py --data=configs/data.json --vocab=configs/vocab.json --training=configs/training.json --model=configs/model.json --output=results/full/```
+python train.py --data=configs/data.json --vocab=configs/vocab.json --training=configs/training.json --model=configs/model.json --output=results/full/
+```
 
 3. Evaluate the text metrics
 ```
