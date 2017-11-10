@@ -41,7 +41,7 @@ def score_dirs(dir_ref, dir_hyp, prepro_img):
 
     # compute scores
     scores = dict()
-    scores["EM"]  = em_tot / float(n_ex) if next > 0 else 0
+    scores["EM"]  = em_tot / float(n_ex) if n_ex > 0 else 0
     scores["Lev"] = 1 - l_dist_tot / float(length_tot) if length_tot > 0 else 0
 
     return scores
@@ -49,6 +49,7 @@ def score_dirs(dir_ref, dir_hyp, prepro_img):
 
 def img_edit_distance(img1, img2):
     """Computes Levenshtein distance between two images.
+    (From Harvard's NLP github)
 
     Slices the images into columns and consider one column as a character.
 
