@@ -64,20 +64,25 @@ make full
 
 1. Build the images from the formulas, write the matching file and extract the vocabulary. __Run only once__ for a dataset
 ```
-python build.py
+python build.py --data=configs/data.json --vocab=configs/vocab.json
 ```
 
-2. Train on this small dataset
+2. Train
 ```
-python train.py
-```
+python train.py --data=configs/data.json --vocab=configs/vocab.json --training=configs/training.json --model=configs/model.json --output=results/full/```
 
 3. Evaluate the text metrics
 ```
-python evaluate_txt.py
+python evaluate_txt.py --results=results/full/
 ```
 
 4. Evaluate the image metrics
 ```
-python evaluate_img.py
+python evaluate_img.py --results=results/full/
+```
+
+(To get more information on the arguments, run)
+
+```
+python file.py --help
 ```
