@@ -137,8 +137,19 @@ class DataGenerator(object):
 
         """
         formulas = load_formulas(filename)
-
         return formulas
+
+
+    def _get_raw_formula(self, formula_id):
+        try:
+            formula_raw = self._formulas[int(formula_id)]
+        except KeyError:
+            print("Tried to access id {} but only {} formulas".format(
+                formula_id, len(self._formulas)))
+            print("Possible fix: mismatch between matching file and formulas")
+            raise KeyError
+
+        return formula_raw
 
 
     def _process_instance(self, example):
@@ -160,8 +171,7 @@ class DataGenerator(object):
 
         img = imread(self._dir_images + "/" + img_path)
         img = self._img_prepro(img)
-
-        formula = self._form_prepro(self._formulas[int(formula_id)])
+        formula = self._form_prepro(self._get_raw_formula(formula_id))
 
         if self._iter_mode == "data":
             inst = (img, formula)

@@ -150,4 +150,5 @@ def load_formulas(filename):
         for idx, line in enumerate(f):
             formulas[idx] = line.strip()
 
+    print("Loaded {} formulas from {}".format(len(formulas), filename))
     return formulas
