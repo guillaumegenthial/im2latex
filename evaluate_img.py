@@ -5,7 +5,7 @@ from model.utils.data_generator import DataGenerator
 from model.img2seq import Img2SeqModel
 from model.utils.general import Config
 from model.utils.text import Vocab, load_formulas
-from model.utils.images import greyscale, build_images
+from model.utils.image import greyscale, build_images
 
 from model.evaluation.text import score_files
 from model.evaluation.image import score_dirs
