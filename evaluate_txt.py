@@ -7,7 +7,7 @@ from model.utils.general import Config
 from model.utils.text import Vocab
 from model.utils.image import greyscale
 
-from model.utils.data import load_formulas
+from model.utils.text import load_formulas
 from model.evaluation.text import score_files
 
 
