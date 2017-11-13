@@ -43,7 +43,7 @@ class BeamSearchDecoderOutput(collections.namedtuple(
 class BeamSearchDecoderCell(object):
 
     def __init__(self, embeddings, cell, batch_size, start_token, end_token,
-            beam_size=5, div_gamma=0.5, div_prob=0.3):
+            beam_size=5, div_gamma=1, div_prob=0):
         """Initializes parameters for Beam Search
 
         Args:
@@ -69,8 +69,8 @@ class BeamSearchDecoderCell(object):
         self._beam_size  = beam_size
         self._end_token = end_token
         self._vocab_size = embeddings.shape[0].value
-        self._div_gamma = div_gamma
-        self._div_prob = div_prob
+        self._div_gamma = float(div_gamma)
+        self._div_prob = float(div_prob)
 
 
     @property
@@ -279,6 +279,7 @@ def add_div_penalty(log_probs, div_gamma, div_prob, batch_size, beam_size,
         div_prob: (float) adds penalty with proba div_prob
 
     """
+    if div_gamma is None or div_prob is None: return log_probs
     if div_gamma == 1. or div_prob == 0.: return log_probs
 
     # 1. get indices that would sort the array
