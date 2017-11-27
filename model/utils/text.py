@@ -19,6 +19,8 @@ class Vocab(object):
         self.id_end = self.tok_to_id[self.config.end]
         self.id_unk = self.tok_to_id[self.config.unk]
 
+        print("Loaded vocab of size {}".format(len(self.tok_to_id)))
+
 
     @property
     def form_prepro(self):

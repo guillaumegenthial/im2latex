@@ -1,12 +1,13 @@
 import tensorflow as tf
 import collections
-from tensorflow.contrib.rnn import RNNCell, LSTMStateTuple
+from tensorflow.contrib.rnn import RNNCell
 
 
 AttentionState = collections.namedtuple("AttentionState", ("cell_state", "o"))
 
 
 class AttentionCell(RNNCell):
+
     def __init__(self, cell, attention_mechanism, dropout, attn_cell_config,
         num_proj, dtype=tf.float32):
         """

@@ -115,11 +115,11 @@ class Img2SeqModel(BaseModel):
     def _add_pred_op(self):
         """Defines self.pred"""
         encoded_img = self.encoder(self.training, self.img, self.dropout)
-        train, test = self.decoder(self.training, encoded_img, self.formula,
+        decoder_output = self.decoder(self.training, encoded_img, self.formula,
                 self.dropout)
 
-        self.pred_train = train
-        self.pred_test  = test
+        self.pred_train = decoder_output["train_outputs"]
+        self.pred_test  = decoder_output["bso_outputs"]
 
 
     def _add_loss_op(self):

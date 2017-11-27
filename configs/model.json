@@ -13,6 +13,7 @@
     },
 
     "decoding": "beam_search",
+    "beam_search_optimization": true,
     "beam_size": 5,
     "div_gamma": 1,
     "div_prob": 0,

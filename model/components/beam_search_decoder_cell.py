@@ -14,13 +14,8 @@ class BeamSearchDecoderCellState(collections.namedtuple(
 
     cell_state: shape = structure of [batch_size, beam_size, ?]
         cell state for all the hypotheses
-    embedding: shape = [batch_size, beam_size, embedding_size]
-        embeddings of the previous time step for each hypothesis
     log_probs: shape = [batch_size, beam_size]
         log_probs of the hypotheses
-    finished: shape = [batch_size, beam_size]
-        boolean to know if one beam hypothesis has reached token id_end
-
     """
     pass
 
@@ -81,17 +76,28 @@ class BeamSearchDecoderCell(object):
 
 
     @property
-    def final_output_dtype(self):
-        """For the finalize method"""
-        return DecoderOutput(logits=self._cell.output_dtype, ids=tf.int32)
+    def output_size(self):
+        return BeamSearchDecoderOutput(
+            tf.TensorShape([self._beam_size, self._vocab_size]),
+            tf.TensorShape([self._beam_size]),
+            tf.TensorShape([self._beam_size]))
 
 
     @property
     def state_size(self):
-        return BeamSearchDecoderOutput(
-                logits=tf.TensorShape([self._beam_size, self._vocab_size]),
-                ids=tf.TensorShape([self._beam_size]),
-                parents=tf.TensorShape([self._beam_size]))
+        return BeamSearchDecoderCellState(self._cell.state_size,
+                tf.TensorShape([self._beam_size]))
+
+
+    # @property
+    # def state_dtype(self):
+    #     return BeamSearchDecoderCellState()
+
+
+    @property
+    def final_output_dtype(self):
+        """For the finalize method"""
+        return DecoderOutput(logits=self._cell.output_dtype, ids=tf.int32)
 
 
     @property
@@ -114,10 +120,20 @@ class BeamSearchDecoderCell(object):
         return BeamSearchDecoderCellState(cell_state, log_probs)
 
 
+    @property
+    def inputs_size(self):
+        return tf.TensorShape([self._beam_size, self._dim_embeddings])
+
+
     def initial_inputs(self):
         return tf.tile(tf.reshape(self._start_token,
                 [1, 1, self._dim_embeddings]),
                 multiples=[self._batch_size, self._beam_size, 1])
+
+
+    @property
+    def finished_size(self):
+        return tf.TensorShape([self._beam_size])
 
 
     def initialize(self):

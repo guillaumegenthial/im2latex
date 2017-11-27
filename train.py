@@ -54,6 +54,7 @@ def main(data, vocab, training, model, output):
     # Build model and train
     model = Img2SeqModel(config, dir_output, vocab)
     model.build_train(config)
+    model.restore_session("results/google/under_50_vanilla_positional/model.weights/")
     model.train(config, train_set, val_set, lr_schedule)
 
 
