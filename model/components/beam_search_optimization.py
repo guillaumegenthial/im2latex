@@ -5,12 +5,12 @@ from tensorflow.contrib.rnn import RNNCell
 
 
 class BSOInput(collections.namedtuple("BSOInput",
-    ("id", "embedding"))):
+    ("ids", "embeddings"))):
     pass
 
 
 class BSOState(collections.namedtuple("BSOState",
-    ("time", "beam_state", "embedding", "finished"))):
+    ("time", "beam_state", "embeddings", "finished"))):
     pass
 
 
@@ -89,9 +89,9 @@ class BSOCell(RNNCell):
 
     def initial_state(self):
         time = tf.constant(0, tf.int32)
-        beam_state, embedding, finished = self._bs_cell.initialize()
+        beam_state, embeddings, finished = self._bs_cell.initialize()
 
-        return BSOState(time, beam_state, embedding, finished)
+        return BSOState(time, beam_state, embeddings, finished)
 
 
     def step(self, inputs, state):
@@ -105,20 +105,27 @@ class BSOCell(RNNCell):
 
         """
         # 1. compute prediction
-        beam_output, beam_state, embedding, finished = self._bs_cell.step(state.time,
-                state.beam_state, state.embedding, state.finished)
+        beam_output, beam_state, embeddings, finished = self._bs_cell.step(state.time,
+                state.beam_state, state.embeddings, state.finished)
 
         # 2. record violation in the loss
-        losses = self._mistake_function(beam_output.logits, inputs.id)
+        losses = self._mistake_function(beam_output.logits, inputs.ids)
 
 
         # 3. replace embeddings for next time step
-        gold_embedding = tf.tile(tf.expand_dims(inputs.embedding, axis=1),
+        # shape = [batch, beam, embeddings]
+        gold_embeddings = tf.tile(tf.expand_dims(inputs.embeddings, axis=1),
                          [1, self._bs_cell._beam_size, 1])
+        # shape = [batch, beam]
+        gold_ids = tf.tile(tf.expand_dims(inputs.ids, axis=1), [1, self._bs_cell._beam_size])
+        # shape = [batch]
+        gold_in_beam = tf.reduce_any(tf.equal(gold_ids, beam_output.ids), axis=-1)
+        # shape = [batch, beam, embeddings]
+        embeddings = tf.where(gold_in_beam, embeddings, gold_embeddings)
 
 
         new_output = BSOOutput(losses, beam_output.logits, beam_output.ids, beam_output.parents)
-        new_state  = BSOState(state.time+1, beam_state, embedding, finished)
+        new_state  = BSOState(state.time+1, beam_state, embeddings, finished)
 
         return (new_output, new_state)
 
