@@ -55,6 +55,11 @@ def main(data, vocab, training, model, output):
     model = Img2SeqModel(config, dir_output, vocab)
     model.build_train(config)
     model.restore_session("results/google/under_50_vanilla_positional/model.weights/")
+
+    config_eval = Config({"dir_answers": model._dir_output + "formulas_val/",
+                "batch_size": config.batch_size})
+    scores = model.evaluate(config_eval, val_set)
+
     model.train(config, train_set, val_set, lr_schedule)
 
 

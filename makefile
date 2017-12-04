@@ -50,3 +50,7 @@ eval:
 	python evaluate_img.py --results=results/full/
 
 full: build train eval
+
+
+test:
+	python train.py --data=configs/data_small.json --vocab=configs/vocab.json --training=configs/training_small.json --model=configs/model.json --output=results/small/

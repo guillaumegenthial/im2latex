@@ -118,24 +118,31 @@ class Img2SeqModel(BaseModel):
         decoder_output = self.decoder(self.training, encoded_img, self.formula,
                 self.dropout)
 
-        self.pred_train = decoder_output["train_outputs"]
-        self.pred_test  = decoder_output["bso_outputs"]
+        self._ops = decoder_output
 
 
     def _add_loss_op(self):
         """Defines self.loss"""
+        # regular cross entropy loss
         losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=self.pred_train, labels=self.formula)
-
+                logits=self._ops["train"], labels=self.formula)
         mask = tf.sequence_mask(self.formula_length)
         losses = tf.boolean_mask(losses, mask)
 
-        # loss for training
-        self.loss = tf.reduce_mean(losses)
-
-        # # to compute perplexity for test
+        # to compute perplexity for test
         self.ce_words = tf.reduce_sum(losses) # sum of CE for each word
         self.n_words = tf.reduce_sum(self.formula_length) # number of words
+
+        # beam search optimization
+        if "bso" in self._ops.keys():
+            print("Using BSO loss")
+            losses = self._ops["bso"].losses
+            losses = tf.boolean_mask(losses, mask)
+        else:
+            print("Using CE loss")
+
+        # loss for training
+        self.loss = tf.reduce_mean(losses)
 
         # for tensorboard
         tf.summary.scalar("loss", self.loss)
@@ -215,7 +222,7 @@ class Img2SeqModel(BaseModel):
             fd = self._get_feed_dict(img, training=False, formula=formula,
                     dropout=1)
             ce_words_eval, n_words_eval, ids_eval = self.sess.run(
-                    [self.ce_words, self.n_words, self.pred_test.ids],
+                    [self.ce_words, self.n_words, self._ops["pred"].ids],
                     feed_dict=fd)
 
             # TODO(guillaume): move this logic into tf graph
@@ -266,7 +273,7 @@ class Img2SeqModel(BaseModel):
             hyps = [[] for i in range(self._config.beam_size)]
 
         fd = self._get_feed_dict(images, training=False, dropout=1)
-        ids_eval, = self.sess.run([self.pred_test.ids], feed_dict=fd)
+        ids_eval, = self.sess.run([self._ops["pred"].ids], feed_dict=fd)
 
         if self._config.decoding == "greedy":
             ids_eval = np.expand_dims(ids_eval, axis=1)

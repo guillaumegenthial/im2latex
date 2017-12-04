@@ -10,7 +10,7 @@ from components.attention_mechanism import AttentionMechanism
 from components.attention_cell import AttentionCell
 from components.greedy_decoder_cell import GreedyDecoderCell
 from components.beam_search_decoder_cell import BeamSearchDecoderCell
-from components.beam_search_optimization import BSOCell
+from components.beam_search_optimization import BSOCell, get_inputs, bso_cross_entropy
 from components.dynamic_rnn import dynamic_rnn
 
 
@@ -59,9 +59,9 @@ class Decoder(object):
             attn_cell = AttentionCell(recu_cell, attn_meca, dropout,
                     self._config.attn_cell_config, self._n_tok)
 
-            train_outputs, _ = tf.nn.dynamic_rnn(attn_cell, embeddings,
+            train_outputs, _ = tf.nn.dynamic_rnn(attn_cell, embeddings[:, :-1, :],
                     initial_state=attn_cell.initial_state())
-            decoder_output["train_outputs"] = train_outputs
+            decoder_output["train"] = train_outputs
 
         # decoding
         with tf.variable_scope("attn_cell", reuse=True):
@@ -80,14 +80,15 @@ class Decoder(object):
                         start_token, self._id_end, self._config.beam_size,
                         self._config.div_gamma, self._config.div_prob)
                 if self._config.beam_search_optimization:
-                    bso_cell = BSOCell(decoder_cell)
-                    bso_outputs, _ = dynamic_rnn(bso_cell, embeddings,
+                    bso_cell = BSOCell(decoder_cell, bso_cross_entropy)
+                    bso_inputs = get_inputs(formula, embeddings[:, 1:, :])
+                    bso_outputs, _ = dynamic_rnn(bso_cell, bso_inputs,
                             initial_state=bso_cell.initial_state())
-                    decoder_output["bso_outputs"] = bso_outputs
+                    decoder_output["bso"] = bso_outputs
 
             test_outputs, _ = dynamic_decode(decoder_cell,
                     self._config.max_length_formula+1)
-            decoder_output["test_outputs"] = test_outputs
+            decoder_output["pred"] = test_outputs
 
         return decoder_output
 
@@ -110,7 +111,7 @@ def get_embeddings(formula, E, dim, start_token, batch_size):
     formula_ = tf.nn.embedding_lookup(E, formula)
     start_token_ = tf.reshape(start_token, [1, 1, dim])
     start_tokens = tf.tile(start_token_, multiples=[batch_size, 1, 1])
-    embeddings = tf.concat([start_tokens, formula_[:, :-1, :]], axis=1)
+    embeddings = tf.concat([start_tokens, formula_[:, :, :]], axis=1)
 
     return embeddings
 

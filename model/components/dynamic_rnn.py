@@ -18,7 +18,10 @@ def dynamic_rnn(decoder_cell, inputs, initial_state):
     """
     Args:
         decoder_cell: (instance of DecoderCell) with step method
-        maximum_iterations: (int)
+                step(inputs, state)
+        inputs: (possibly nested structure) of tensors of
+                shape = [batch, max_time_steps, ...]
+        initial_state: (tensor) instance of decodercell state
 
     """
     # create TA for outputs by mimicing the structure of decodercell output
@@ -26,7 +29,7 @@ def dynamic_rnn(decoder_cell, inputs, initial_state):
         return tf.TensorArray(dtype=d, size=0, dynamic_size=True)
 
     initial_time = tf.constant(0, dtype=tf.int32)
-    n_steps = tf.shape(inputs)[1]
+    n_steps = tf.shape(inputs[0])[1]
 
     initial_outputs_ta = nest.map_structure(create_ta, decoder_cell.output_dtype)
 
@@ -34,7 +37,8 @@ def dynamic_rnn(decoder_cell, inputs, initial_state):
         return time < n_steps
 
     def body(time, outputs_ta, state):
-        new_output, new_state = decoder_cell.step(inputs[:, time], state)
+        inputs_t = nest.map_structure(lambda t: t[:, time], inputs)
+        new_output, new_state = decoder_cell.step(inputs_t, state)
 
         outputs_ta = nest.map_structure(lambda ta, out: ta.write(time, out),
                                       outputs_ta, new_output)
