@@ -135,11 +135,11 @@ class Img2SeqModel(BaseModel):
 
         # beam search optimization
         if "bso" in self._ops.keys():
-            print("Using BSO loss")
+            print("- Using BSO loss")
             losses = self._ops["bso"].losses
             losses = tf.boolean_mask(losses, mask)
         else:
-            print("Using CE loss")
+            print("- Using CE loss")
 
         # loss for training
         self.loss = tf.reduce_mean(losses)

@@ -89,11 +89,6 @@ class BeamSearchDecoderCell(object):
                 tf.TensorShape([self._beam_size]))
 
 
-    # @property
-    # def state_dtype(self):
-    #     return BeamSearchDecoderCellState()
-
-
     @property
     def final_output_dtype(self):
         """For the finalize method"""
@@ -403,44 +398,6 @@ def mask_probs(probs, end_token, finished):
     finished = tf.expand_dims(tf.cast(finished, probs.dtype), axis=-1)
 
     return (1. - finished) * probs + finished * one_hot
-
-
-# def gather_helper(t, indices, batch_size, beam_size, flat=False):
-#   """
-#     Args:
-#         t: tensor of shape = [batch_size, beam_size, d]
-#         indices: tensor of shape = [batch_size, beam_size]
-#         flat: (bool) if true, indices are indices for the last dimension!
-
-#     Returns:
-#         new_t: tensor w shape as t but new_t[ex, i] = t[ex, indices[ex, i]]
-
-#   """
-#   if flat:
-#     # shape = (batch)
-#     _indices = tf.range(batch_size) * beam_size * tf.shape(t)[2]
-#     # shape = (batch, 1)
-#     _indices = tf.expand_dims(_indices, axis=1)
-#     # shape = (batch, beam)
-#     _indices += indices
-#     # shape = (batch * beam)
-#     _indices = tf.reshape(_indices, [-1])
-#     # shape = (batch * beam * vocab)
-#     t = tf.reshape(t, [-1])
-#     # shape = (batch * beam)
-#     output = tf.gather(t, _indices)
-#     # shape = (batch, beam)
-#     output = tf.reshape(output, shape=[batch_size, beam_size])
-
-#   else:
-#     shape = [tf.shape(t)[i] for i in range(len(t.shape))]
-#     range_ = tf.expand_dims(tf.range(batch_size) * beam_size, axis=1)
-#     indices = tf.reshape(indices + range_, [-1])
-#     output = tf.gather(tf.reshape(t, [batch_size*beam_size, -1]), indices)
-#     final_shape = [batch_size, beam_size] + shape[2:]
-#     output = tf.reshape(output, final_shape)
-
-#   return output
 
 
 def gather_helper(t, indices, batch_size, beam_size):
