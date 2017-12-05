@@ -42,8 +42,9 @@ def dynamic_decode(decoder_cell, maximum_iterations):
         return tf.logical_not(tf.reduce_all(finished))
 
     def body(time, outputs_ta, state, inputs, finished):
+        restart = tf.equal(time, initial_time)
         new_output, new_state, new_inputs, new_finished = decoder_cell.step(
-            time, state, inputs, finished)
+            restart, state, inputs, finished)
 
         outputs_ta = nest.map_structure(lambda ta, out: ta.write(time, out),
                                       outputs_ta, new_output)

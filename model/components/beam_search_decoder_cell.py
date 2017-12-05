@@ -144,10 +144,11 @@ class BeamSearchDecoderCell(object):
         return initial_state, initial_inputs, initial_finished
 
 
-    def step(self, time, state, embedding, finished):
+    def step(self, restart, state, embedding, finished):
         """
         Args:
-            time: tensorf or int
+            restart: boolean, if true, consider that we need to expand the beam
+                    or tensor of booleans of shape = [batch] (restart for each beam)
             embedding: shape [batch_size, beam_size, d]
             state: structure of shape [bach_size, beam_size, ...]
             finished: structure of shape [batch_size, beam_size, ...]
@@ -179,10 +180,16 @@ class BeamSearchDecoderCell(object):
         # shape =  (batch_size, beam_size * vocab_size)
         log_probs_flat = tf.reshape(log_probs,
                 [self._batch_size, self._beam_size * self._vocab_size])
-        # if time = 0, consider only one beam, otherwise beams are equal
-        log_probs_flat = tf.cond(time > 0, lambda: log_probs_flat,
-                lambda: log_probs[:, 0])
-        new_probs, indices = tf.nn.top_k(log_probs_flat, self._beam_size)
+        # if restart, consider only one beam, otherwise beams are equal
+        if len(restart.shape) == 0:
+            log_probs_flat = tf.cond(restart, lambda: log_probs[:, 0], lambda: log_probs_flat)
+            new_probs, indices = tf.nn.top_k(log_probs_flat, self._beam_size)
+        else:
+            # TODO(guillaume): check the hack
+            new_probs, indices = tf.nn.top_k(log_probs_flat, self._beam_size)
+            new_probs_first, indices_first = tf.nn.top_k(log_probs[:, 0], self._beam_size)
+            indices = tf.where(restart, indices_first, indices)
+            new_probs = tf.where(restart, new_probs_first, new_probs)
 
         # of shape [batch_size, beam_size]
         new_ids = indices % self._vocab_size
@@ -398,6 +405,44 @@ def mask_probs(probs, end_token, finished):
     return (1. - finished) * probs + finished * one_hot
 
 
+# def gather_helper(t, indices, batch_size, beam_size, flat=False):
+#   """
+#     Args:
+#         t: tensor of shape = [batch_size, beam_size, d]
+#         indices: tensor of shape = [batch_size, beam_size]
+#         flat: (bool) if true, indices are indices for the last dimension!
+
+#     Returns:
+#         new_t: tensor w shape as t but new_t[ex, i] = t[ex, indices[ex, i]]
+
+#   """
+#   if flat:
+#     # shape = (batch)
+#     _indices = tf.range(batch_size) * beam_size * tf.shape(t)[2]
+#     # shape = (batch, 1)
+#     _indices = tf.expand_dims(_indices, axis=1)
+#     # shape = (batch, beam)
+#     _indices += indices
+#     # shape = (batch * beam)
+#     _indices = tf.reshape(_indices, [-1])
+#     # shape = (batch * beam * vocab)
+#     t = tf.reshape(t, [-1])
+#     # shape = (batch * beam)
+#     output = tf.gather(t, _indices)
+#     # shape = (batch, beam)
+#     output = tf.reshape(output, shape=[batch_size, beam_size])
+
+#   else:
+#     shape = [tf.shape(t)[i] for i in range(len(t.shape))]
+#     range_ = tf.expand_dims(tf.range(batch_size) * beam_size, axis=1)
+#     indices = tf.reshape(indices + range_, [-1])
+#     output = tf.gather(tf.reshape(t, [batch_size*beam_size, -1]), indices)
+#     final_shape = [batch_size, beam_size] + shape[2:]
+#     output = tf.reshape(output, final_shape)
+
+#   return output
+
+
 def gather_helper(t, indices, batch_size, beam_size):
     """
     Args:
@@ -408,15 +453,12 @@ def gather_helper(t, indices, batch_size, beam_size):
         new_t: tensor w shape as t but new_t[:, i] = t[:, new_parents[:, i]]
 
     """
+    shape_ = [t.shape[i].value for i in range(len(t.shape))]
     range_  = tf.expand_dims(tf.range(batch_size) * beam_size, axis=1)
     indices = tf.reshape(indices + range_, [-1])
     output  = tf.gather(
         tf.reshape(t, [batch_size*beam_size, -1]),
         indices)
+    final_shape = [batch_size, beam_size] + shape_[2:]
 
-    if t.shape.ndims == 2:
-        return tf.reshape(output, [batch_size, beam_size])
-
-    elif t.shape.ndims == 3:
-        d = t.shape[-1].value
-        return tf.reshape(output, [batch_size, beam_size, d])
+    return tf.reshape(output, final_shape)

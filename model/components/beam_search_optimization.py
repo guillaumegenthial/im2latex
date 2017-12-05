@@ -4,13 +4,16 @@ from tensorflow.python.util import nest
 from tensorflow.contrib.rnn import RNNCell
 
 
+from beam_search_decoder_cell import gather_helper
+
+
 class BSOInput(collections.namedtuple("BSOInput",
     ("ids", "embeddings"))):
     pass
 
 
 class BSOState(collections.namedtuple("BSOState",
-    ("time", "beam_state", "embeddings", "finished"))):
+    ("restart", "beam_state", "embeddings", "finished"))):
     pass
 
 
@@ -29,19 +32,20 @@ def get_inputs(ids, embeddings):
     return nest.map_structure(lambda i, e: BSOInput(i, e), ids, embeddings)
 
 
-def bso_cross_entropy(logits, ids, reduce_mode="sum"):
+def bso_cross_entropy(logits, pred_ids=None, gold_ids=None, reduce_mode="sum"):
     """
     Args:
         logits: shape = [batch, beam, vocab]
-        ids: shape = [batch]
+        pred_ids: shape = [batch, beam]
+        gold_ids: shape = [batch]
 
     Returns:
         losses: shape = [batch]
 
     """
     beam_size = logits.shape[1]
-    ids = tf.tile(tf.expand_dims(ids, axis=1), [1, beam_size])
-    ce_beams = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=ids)
+    gold_ids = tf.tile(tf.expand_dims(gold_ids, axis=1), [1, beam_size])
+    ce_beams = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=gold_ids)
     if reduce_mode == "max":
         losses = tf.reduce_max(ce_beams, axis=-1)
     elif reduce_mode == "sum":
@@ -49,6 +53,15 @@ def bso_cross_entropy(logits, ids, reduce_mode="sum"):
     else:
         raise NotImplementedError("Unknown reduce mode {}".format(reduce_mode))
     return losses
+
+
+def get_bso_margin(batch_size, beam_size):
+    def bso_margin(logits, pred_ids=None, gold_ids=None):
+        # shape = [batch, beam]
+        pred_logits = gather_helper(logits, pred_ids, batch_size, beam_size, flat=True)
+        worst_logit = pred_logits[:, -1]
+
+    return bso_margin
 
 
 class BSOCell(RNNCell):
@@ -88,10 +101,10 @@ class BSOCell(RNNCell):
 
 
     def initial_state(self):
-        time = tf.constant(0, tf.int32)
+        restart = tf.ones(shape=[self._bs_cell._batch_size], dtype=tf.bool)
         beam_state, embeddings, finished = self._bs_cell.initialize()
 
-        return BSOState(time, beam_state, embeddings, finished)
+        return BSOState(restart, beam_state, embeddings, finished)
 
 
     def step(self, inputs, state):
@@ -105,12 +118,12 @@ class BSOCell(RNNCell):
 
         """
         # 1. compute prediction
-        beam_output, beam_state, embeddings, finished = self._bs_cell.step(state.time,
+        beam_output, beam_state, embeddings, finished = self._bs_cell.step(state.restart,
                 state.beam_state, state.embeddings, state.finished)
 
         # 2. record violation in the loss
-        losses = self._mistake_function(beam_output.logits, inputs.ids)
-
+        losses = self._mistake_function(beam_output.logits, pred_ids=beam_output.ids,
+                                        gold_ids=inputs.ids)
 
         # 3. replace embeddings for next time step
         # shape = [batch, beam, embeddings]
@@ -123,9 +136,8 @@ class BSOCell(RNNCell):
         # shape = [batch, beam, embeddings]
         embeddings = tf.where(gold_in_beam, embeddings, gold_embeddings)
 
-
         new_output = BSOOutput(losses, beam_output.logits, beam_output.ids, beam_output.parents)
-        new_state  = BSOState(state.time+1, beam_state, embeddings, finished)
+        new_state  = BSOState(gold_in_beam, beam_state, embeddings, finished)
 
         return (new_output, new_state)
 

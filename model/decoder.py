@@ -10,7 +10,8 @@ from components.attention_mechanism import AttentionMechanism
 from components.attention_cell import AttentionCell
 from components.greedy_decoder_cell import GreedyDecoderCell
 from components.beam_search_decoder_cell import BeamSearchDecoderCell
-from components.beam_search_optimization import BSOCell, get_inputs, bso_cross_entropy
+from components.beam_search_optimization import BSOCell, get_inputs, bso_cross_entropy, \
+        get_bso_margin
 from components.dynamic_rnn import dynamic_rnn
 
 
@@ -80,7 +81,9 @@ class Decoder(object):
                         start_token, self._id_end, self._config.beam_size,
                         self._config.div_gamma, self._config.div_prob)
                 if self._config.beam_search_optimization:
-                    bso_cell = BSOCell(decoder_cell, bso_cross_entropy)
+                    # mistake_function = get_bso_margin(batch_size, self._config.beam_size)
+                    mistake_function = bso_cross_entropy
+                    bso_cell = BSOCell(decoder_cell, mistake_function)
                     bso_inputs = get_inputs(formula, embeddings[:, 1:, :])
                     bso_outputs, _ = dynamic_rnn(bso_cell, bso_inputs,
                             initial_state=bso_cell.initial_state())
