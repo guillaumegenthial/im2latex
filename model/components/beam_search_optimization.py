@@ -61,7 +61,7 @@ def bso_loss(margins, violations, **kwargs):
     return margins * tf.cast(violations, margins.dtype)
 
 
-def bso_margins(logits, gold_beam, gold_ids, pred_ids, batch_size, beam_size):
+def bso_margins(logits, gold_beam, gold_ids, pred_ids):
     """
     Args:
         logits: shape = [batch, beam, vocab]
@@ -71,18 +71,20 @@ def bso_margins(logits, gold_beam, gold_ids, pred_ids, batch_size, beam_size):
 
     """
     # shape = [batch]
+    beam_size = logits.shape[1].value
+    batch_size = tf.shape(logits)[0]
     worst_beam = (beam_size - 1) * tf.ones(shape=[batch_size], dtype=tf.int32)
     worst_ids = pred_ids[:, -1]
-    worst_scores = get_entry(logits, worst_beam, worst_ids, batch_size, beam_size)
+    worst_scores = get_entry(logits, worst_beam, worst_ids)
 
     # shape = [batch]
-    gold_scores = get_entry(logits, gold_beam, gold_ids, batch_size, beam_size)
+    gold_scores = get_entry(logits, gold_beam, gold_ids)
     bso_margins = worst_scores + 1 - gold_scores
 
     return bso_margins
 
 
-def get_entry(t, indices_1d, indices_2d, batch_size, beam_size):
+def get_entry(t, indices_1d, indices_2d):
     """
     Args:
         t: shape = [batch, beam, vocab]
@@ -93,14 +95,9 @@ def get_entry(t, indices_1d, indices_2d, batch_size, beam_size):
         o: shape = [batch], with o[i] = t[i, indices_1d[i], indices_2d[i]]
 
     """
-    vocab_size = t.shape[2].value
-    # shape = [batch]
-    _indices = tf.range(batch_size) * beam_size * vocab_size
-    _indices += indices_1d * vocab_size + indices_2d
-    # shape = [batch * beam * vocab]
-    t = tf.reshape(t, [-1])
-    # shape = [batch]
-    return tf.gather(t, _indices)
+    batch_size = tf.shape(t)[0]
+    indices = tf.stack([tf.range(batch_size), indices_1d, indices_2d], axis=1)
+    return tf.gather_nd(t, indices)
 
 
 class BSOCell(RNNCell):
@@ -165,8 +162,7 @@ class BSOCell(RNNCell):
                 state.beam_state, state.embeddings, state.finished)
 
         # 2. record violation in the loss
-        margins = bso_margins(beam_output.logits, state.gold_beam, inputs.ids, beam_output.ids,
-                self._batch_size, self._beam_size)
+        margins = bso_margins(beam_output.logits, state.gold_beam, inputs.ids, beam_output.ids)
         violations = tf.greater(margins, tf.constant(0, dtype=margins.dtype))
         losses = self._mistake_function(logits=beam_output.logits, pred_ids=beam_output.ids,
                                         gold_ids=inputs.ids, margins=margins, violations=violations)

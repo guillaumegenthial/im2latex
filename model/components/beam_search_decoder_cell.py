@@ -407,15 +407,10 @@ def gather_helper(t, indices, batch_size, beam_size):
         indices: tensor of shape = [batch_size, beam_size]
 
     Returns:
-        new_t: tensor w shape as t but new_t[:, i] = t[:, new_parents[:, i]]
+        new_t: tensor w shape as t but new_t[i, j] = t[i, indices[i, j]]]
 
     """
-    shape_ = [t.shape[i].value for i in range(len(t.shape))]
-    range_  = tf.expand_dims(tf.range(batch_size) * beam_size, axis=1)
-    indices = tf.reshape(indices + range_, [-1])
-    output  = tf.gather(
-        tf.reshape(t, [batch_size*beam_size, -1]),
-        indices)
-    final_shape = [batch_size, beam_size] + shape_[2:]
+    batch_indices = tf.tile(tf.expand_dims(tf.range(batch_size), axis=-1), [1, beam_size])
+    indices = tf.stack([batch_indices, indices], axis=2)
+    return tf.gather_nd(t, indices)
 
-    return tf.reshape(output, final_shape)
