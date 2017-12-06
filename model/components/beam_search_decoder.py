@@ -5,7 +5,7 @@ from tensorflow.contrib.rnn import RNNCell
 
 
 from dynamic_decode import transpose_batch_time
-from greedy_decoder_cell import DecoderOutput
+from greedy_decoder import DecoderOutput
 
 
 class BeamSearchDecoderCellState(collections.namedtuple(
@@ -139,22 +139,14 @@ class BeamSearchDecoderCell(object):
         return initial_state, initial_inputs, initial_finished
 
 
-    def step(self, restart, state, embedding, finished):
-        """
-        Args:
-            restart: boolean, if true, consider that we need to expand the beam
-                    or tensor of booleans of shape = [batch] (restart for each beam)
-            embedding: shape [batch_size, beam_size, d]
-            state: structure of shape [bach_size, beam_size, ...]
-            finished: structure of shape [batch_size, beam_size, ...]
-
-        """
+    def _expand(self, state, embeddings, finished):
+        """Expand the beams"""
         # merge batch and beam dimension before callling step of cell
         cell_state = nest.map_structure(merge_batch_beam, state.cell_state)
-        embedding = merge_batch_beam(embedding)
+        embeddings = merge_batch_beam(embeddings)
 
         # compute new logits
-        logits, new_cell_state = self._cell.step(embedding, cell_state)
+        logits, new_cell_state = self._cell.step(embeddings, cell_state)
 
         # split batch and beam dimension before beam search logic
         new_logits = split_batch_beam(logits, self._beam_size)
@@ -167,51 +159,70 @@ class BeamSearchDecoderCell(object):
         # shape = [batch_size, beam_size, vocab_size]
         step_log_probs = mask_probs(step_log_probs, self._end_token, finished)
         # shape = [batch_size, beam_size, vocab_size]
-        log_probs = tf.expand_dims(state.log_probs, axis=-1) + step_log_probs
-        log_probs = add_div_penalty(log_probs, self._div_gamma, self._div_prob,
-                self._batch_size, self._beam_size, self._vocab_size)
+        new_log_probs = tf.expand_dims(state.log_probs, axis=-1) + step_log_probs
+        new_log_probs = add_div_penalty(new_log_probs, self._div_gamma, self._div_prob,
+                                        self._batch_size, self._beam_size, self._vocab_size)
 
-        # compute the best beams
+        return new_logits, new_cell_state, new_log_probs
+
+
+    def _extract(self, restarts, log_probs):
+        """Extract best hypotheses from the expanded beams"""
         # shape =  (batch_size, beam_size * vocab_size)
         log_probs_flat = tf.reshape(log_probs,
                 [self._batch_size, self._beam_size * self._vocab_size])
         # if restart, consider only one beam, otherwise beams are equal
-        if len(restart.shape) == 0:
-            log_probs_flat = tf.cond(restart, lambda: log_probs[:, 0], lambda: log_probs_flat)
+        if len(restarts.shape) == 0:
+            log_probs_flat = tf.cond(restarts, lambda: log_probs[:, 0], lambda: log_probs_flat)
             new_probs, indices = tf.nn.top_k(log_probs_flat, self._beam_size)
         else:
-            # TODO(guillaume): check the hack
+            # TODO(guillaume): improve the hack
             new_probs, indices = tf.nn.top_k(log_probs_flat, self._beam_size)
-            new_probs_first, indices_first = tf.nn.top_k(log_probs[:, 0], self._beam_size)
-            indices = tf.where(restart, indices_first, indices)
-            new_probs = tf.where(restart, new_probs_first, new_probs)
+            new_probs_restarts, indices_restarts = tf.nn.top_k(log_probs[:, 0], self._beam_size)
+            new_probs = tf.where(restarts, new_probs_restarts, new_probs)
+            indices = tf.where(restarts, indices_restarts, indices)
 
-        # of shape [batch_size, beam_size]
+        # shape [batch_size, beam_size]
         new_ids = indices % self._vocab_size
         new_parents = indices // self._vocab_size
 
-        # get ids of words predicted and get embedding
-        new_embedding = tf.nn.embedding_lookup(self._embeddings, new_ids)
-
-        # compute end of beam
-        finished = gather_helper(finished, new_parents,
-                self._batch_size, self._beam_size)
-        new_finished = tf.logical_or(finished,
-                tf.equal(new_ids, self._end_token))
-
-        new_cell_state = nest.map_structure(
-                lambda t: gather_helper(t, new_parents, self._batch_size,
-                self._beam_size), new_cell_state)
+        return new_ids, new_parents, new_probs
 
 
-        # create new state of decoder
-        new_state  = BeamSearchDecoderCellState(cell_state=new_cell_state,
-                log_probs=new_probs)
+    def _gather(self, new_ids, new_parents, exp_cell_state, finished):
+        beam_finished = gather_helper(finished, new_parents)
+        new_finished = tf.logical_or(beam_finished, tf.equal(new_ids, self._end_token))
+        new_cell_state = nest.map_structure(lambda t: gather_helper(t, new_parents), exp_cell_state)
+        new_embeddings = tf.nn.embedding_lookup(self._embeddings, new_ids)
 
-        new_output = BeamSearchDecoderOutput(logits=new_logits, ids=new_ids,
-                parents=new_parents)
+        return new_embeddings, new_finished, new_cell_state
 
-        return (new_output, new_state, new_embedding, new_finished)
+
+    def _step(self, restarts, state, embeddings, finished):
+        """
+        Args:
+            restarts: boolean, if true, consider that we need to expand the beam
+                    or tensor of booleans of shape = [batch] (restart for each beam)
+            embeddings: shape [batch_size, beam_size, d]
+            state: structure of shape [bach_size, beam_size, ...]
+            finished: structure of shape [batch_size, beam_size, ...]
+
+        """
+        exp_logits, exp_cell_state, exp_log_probs = self._expand(state, embeddings, finished)
+        new_ids, new_parents, new_log_probs = self._extract(restarts, exp_log_probs)
+        new_embeddings, new_finished, new_cell_state = self._gather(new_ids, new_parents,
+                exp_cell_state, finished)
+
+        new_output = BeamSearchDecoderOutput(logits=exp_logits, ids=new_ids, parents=new_parents)
+        new_state  = BeamSearchDecoderCellState(cell_state=new_cell_state, log_probs=new_log_probs)
+
+        return (new_output, new_state, new_embeddings, new_finished, exp_cell_state, exp_log_probs)
+
+
+    def step(self, restarts, state, embeddings, finished):
+        (output, state, embeddings, finished, _, _) = self._step(restarts, state, embeddings,
+                                                                 finished)
+        return output, state, embeddings, finished
 
 
     def finalize(self, final_outputs, final_state):
@@ -250,13 +261,10 @@ class BeamSearchDecoderCell(object):
             input_t = nest.map_structure(lambda t: t[time], final_outputs)
 
             # extract the entries corresponding to parents
-            new_state = nest.map_structure(
-                    lambda t: gather_helper(t, parents, self._batch_size,
-                    self._beam_size), input_t)
+            new_state = nest.map_structure(lambda t: gather_helper(t, parents), input_t)
 
             # create new output
-            new_output = DecoderOutput(logits=new_state.logits,
-                    ids=new_state.ids)
+            new_output = DecoderOutput(logits=new_state.logits, ids=new_state.ids)
 
             # write beam ids
             outputs_ta = nest.map_structure(lambda ta, out: ta.write(time, out),
@@ -274,8 +282,7 @@ class BeamSearchDecoderCell(object):
         final_outputs = nest.map_structure(lambda ta: ta.stack(), res[1])
 
         # reverse time step
-        final_outputs = nest.map_structure(lambda t: tf.reverse(t, axis=[0]),
-                final_outputs)
+        final_outputs = nest.map_structure(lambda t: tf.reverse(t, axis=[0]), final_outputs)
 
         return DecoderOutput(logits=final_outputs.logits, ids=final_outputs.ids)
 
@@ -373,13 +380,7 @@ def tile_beam(t, beam_size):
     """
     # shape = [batch_size, 1 , x]
     t = tf.expand_dims(t, axis=1)
-    if t.shape.ndims == 2:
-        multiples = [1, beam_size]
-    elif t.shape.ndims == 3:
-        multiples = [1, beam_size, 1]
-    elif t.shape.ndims == 4:
-        multiples = [1, beam_size, 1, 1]
-
+    multiples = [1, beam_size] + [1] * (len(t.shape)-2)
     return tf.tile(t, multiples)
 
 
@@ -400,7 +401,7 @@ def mask_probs(probs, end_token, finished):
     return (1. - finished) * probs + finished * one_hot
 
 
-def gather_helper(t, indices, batch_size, beam_size):
+def gather_helper(t, indices):
     """
     Args:
         t: tensor of shape = [batch_size, beam_size, d]
@@ -410,6 +411,7 @@ def gather_helper(t, indices, batch_size, beam_size):
         new_t: tensor w shape as t but new_t[i, j] = t[i, indices[i, j]]]
 
     """
+    batch_size, beam_size = tf.shape(t)[0], t.shape[1].value
     batch_indices = tf.tile(tf.expand_dims(tf.range(batch_size), axis=-1), [1, beam_size])
     indices = tf.stack([batch_indices, indices], axis=2)
     return tf.gather_nd(t, indices)

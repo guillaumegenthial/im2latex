@@ -4,32 +4,38 @@ from tensorflow.python.util import nest
 from tensorflow.contrib.rnn import RNNCell
 
 
-from beam_search_decoder_cell import gather_helper
-
-
-class BSOInput(collections.namedtuple("BSOInput",
-    ("ids", "embeddings"))):
-    pass
+from beam_search_decoder import BeamSearchDecoderOutput, BeamSearchDecoderCellState, tile_beam, \
+    gather_helper
 
 
 class BSOState(collections.namedtuple("BSOState",
     ("restarts", "gold_beam", "beam_state", "embeddings", "finished"))):
+    """State for Beam Search Optimization wrapper
+
+    restarts: (tf.bool) shape = [batch], if True, need to restart from restart_indices beam
+    gold_beam: (tf.int32) shape = [batch], id of the beam that has the gold_beam
+    beam_state: BeamSearchDecoderCellState
+    embeddings: (tf.float32) shape = [batch, beam, embedding]
+    finished: (tf.bool) shape = [batch, beam] true if beam reached the <eos> token
+
+    """
     pass
 
 
 class BSOOutput(collections.namedtuple("BSOOutput",
     ("losses", "logits", "ids", "parents"))):
+    """Output of BSO = BeamSearchOutput + losses
+
+    losses: (tf.float32) shape = [batch]
+    logits: shape = [batch_size, beam_size, vocab_size]
+        scores before softmax of the beam search hypotheses
+    ids: shape = [batch_size, beam_size]
+        ids of the best words at this time step
+    parents: shape = [batch_size, beam_size]
+        ids of the beam index from previous time step
+
+    """
     pass
-
-
-def get_inputs(ids, embeddings):
-    """
-    Args:
-        ids: shape = [batch_size]
-        embeddings: shape = [batch_size, embedding_size]
-
-    """
-    return nest.map_structure(lambda i, e: BSOInput(i, e), ids, embeddings)
 
 
 def bso_cross_entropy(logits, gold_ids, reduce_mode="min", **kwargs):
@@ -58,26 +64,28 @@ def bso_cross_entropy(logits, gold_ids, reduce_mode="min", **kwargs):
 
 
 def bso_loss(margins, violations, **kwargs):
+    # TODO(guillaume): different loss for last time step
     return margins * tf.cast(violations, margins.dtype)
 
 
-def bso_margins(logits, gold_beam, gold_ids, pred_ids):
+def bso_margins(logits, gold_beam, gold_ids, pred_beam, pred_ids):
     """
     Args:
         logits: shape = [batch, beam, vocab]
         gold_beam: shape = [batch] id of the beam whose previous token was the gold token
         gold_ids: shape = [batch] id of the gold token at this time step
+        pred_beam: shape = [batch, beam] id of the beam whose predicted token is attached
         pred_ids: shape = [batch, beam] ids predicted by the beam search
 
     """
-    # shape = [batch]
+    # variables
     beam_size = logits.shape[1].value
     batch_size = tf.shape(logits)[0]
-    worst_beam = (beam_size - 1) * tf.ones(shape=[batch_size], dtype=tf.int32)
+    # extract K-th hypothesis score
+    worst_beam = pred_beam[:, -1]
     worst_ids = pred_ids[:, -1]
     worst_scores = get_entry(logits, worst_beam, worst_ids)
-
-    # shape = [batch]
+    # extract gold hypothesis score
     gold_scores = get_entry(logits, gold_beam, gold_ids)
     bso_margins = worst_scores + 1 - gold_scores
 
@@ -115,7 +123,7 @@ class BSOCell(RNNCell):
         """
         self._bs_cell = beam_search_cell
         self._state_size = BSOState(tf.TensorShape(1), tf.TensorShape(1), self._bs_cell.state_size,
-                                    self._bs_cell.inputs_size, self._bs_cell.finished_size)
+                self._bs_cell.inputs_size, self._bs_cell.finished_size)
         self._output_size = self._bs_cell.output_size
         self._mistake_function = mistake_function
         self._batch_size = self._bs_cell._batch_size
@@ -147,46 +155,65 @@ class BSOCell(RNNCell):
         return BSOState(restarts, gold_beam, beam_state, embeddings, finished)
 
 
-    def step(self, inputs, state):
+    def step(self, gold_ids, state):
         """
         Args:
-            inputs: token at time step t, named_tuple of
-                    ids: shape = [batch_size]
-                    embeddings: shape = [batch_size, embedding_size]
+            gold_ids: token at time step t, ids: shape = [batch_size]
                 embeddings of gold words from time step t
             state: instance of BSOState from previous time step t-1
 
         """
-        # 1. compute prediction
-        beam_output, beam_state, embeddings, finished = self._bs_cell.step(state.restarts,
-                state.beam_state, state.embeddings, state.finished)
+        # 1. get id of (t-1) gold beam and (t) gold ids
+        # shape = [batch]
+        gold_beam = state.gold_beam
+        # shape = [batch, beam]
+        gold_beam_tiled = tile_beam(gold_beam, self._beam_size)
+        gold_ids_tiled  = tile_beam(gold_ids, self._beam_size)
 
-        # 2. record violation in the loss
-        margins = bso_margins(beam_output.logits, state.gold_beam, inputs.ids, beam_output.ids)
+        # 2. expand beam with regular beam search
+        o = self._bs_cell._step(state.restarts, state.beam_state, state.embeddings, state.finished)
+        (beam_output, beam_state, embeddings, finished, exp_cell_state, exp_log_probs) = o
+
+        # 3. beam from gold beam to gold_id
+        gold_embeddings, gold_finished, gold_cell_state = self._bs_cell._gather(gold_ids_tiled,
+                gold_beam_tiled, exp_cell_state, state.finished)
+        # shape = [batch]
+        gold_log_probs = get_entry(exp_log_probs, gold_beam, gold_ids)
+        gold_log_probs = tile_beam(gold_log_probs, self._beam_size)
+        gold_beam_state = BeamSearchDecoderCellState(cell_state=gold_cell_state,
+                                                     log_probs=gold_log_probs)
+
+        # 4. compute margins and violations
+        logits, pred_beam, pred_ids = (beam_output.logits, beam_output.parents, beam_output.ids)
+        # shape = [batch]
+        margins = bso_margins(logits, gold_beam, gold_ids, pred_beam, pred_ids)
         violations = tf.greater(margins, tf.constant(0, dtype=margins.dtype))
-        losses = self._mistake_function(logits=beam_output.logits, pred_ids=beam_output.ids,
-                                        gold_ids=inputs.ids, margins=margins, violations=violations)
+        losses = self._mistake_function(logits=logits, pred_ids=pred_ids, gold_ids=gold_ids,
+                margins=margins, violations=violations)
 
+        # 5. check if gold hypothesis fell out of the beam
         # shape = [batch, beam]
-        gold_ids = tf.tile(tf.expand_dims(inputs.ids, axis=1), [1, self._beam_size])
-        # shape = [batch, beam]
-        gold_in_beams = tf.equal(gold_ids, beam_output.ids)
+        gold_ids_in_beams = tf.equal(gold_ids_tiled, pred_ids)
         # shape = [batch]
-        gold_in_beam = tf.reduce_any(gold_in_beams, axis=-1)
+        gold_in_beam = tf.reduce_any(gold_ids_in_beams, axis=-1)
         gold_not_in_beam = tf.logical_not(gold_in_beam)
-        restarts = tf.logical_or(gold_not_in_beam, violations)
-        # shape = [batch]
-        gold_beam = tf.argmax(tf.cast(gold_in_beams, tf.int32), axis=-1, output_type=tf.int32)
 
-        # TODO(guillaume): adapt the state of the beam search and decoder so that they restart
+        # 6. compute next state, need to restart from gold if margin violation or gold fell
+        # shape = [batch]
+        new_restarts = tf.logical_or(gold_not_in_beam, violations)
+        new_gold_beam = tf.argmax(tf.cast(gold_ids_in_beams, tf.int32), axis=-1,
+                                  output_type=tf.int32)
+
+
         # shape = [batch, beam, embeddings]
-        gold_beam = tf.where(restarts, self.initial_state.gold_beam, gold_beam)
-        gold_embeddings = tf.tile(tf.expand_dims(inputs.embeddings, axis=1),
-                [1, self._beam_size, 1])
-        embeddings = tf.where(restarts, embeddings, gold_embeddings)
+        apply_restart = lambda t, gold_t: tf.where(new_restarts, gold_t, t)
+        new_gold_beam = apply_restart(new_gold_beam, self.initial_state.gold_beam)
+        new_embeddings = apply_restart(embeddings, gold_embeddings)
+        new_beam_state = nest.map_structure(apply_restart, beam_state, gold_beam_state)
+        new_finished = apply_restart(finished, gold_finished)
 
         new_output = BSOOutput(losses, beam_output.logits, beam_output.ids, beam_output.parents)
-        new_state  = BSOState(restarts, gold_beam, beam_state, embeddings, finished)
+        new_state  = BSOState(new_restarts, new_gold_beam, new_beam_state, new_embeddings, new_finished)
 
         return (new_output, new_state)
 

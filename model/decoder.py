@@ -8,9 +8,9 @@ from tensorflow.contrib.rnn import GRUCell, LSTMCell
 from components.dynamic_decode import dynamic_decode
 from components.attention_mechanism import AttentionMechanism
 from components.attention_cell import AttentionCell
-from components.greedy_decoder_cell import GreedyDecoderCell
-from components.beam_search_decoder_cell import BeamSearchDecoderCell
-from components.beam_search_optimization import BSOCell, get_inputs, bso_cross_entropy, bso_loss
+from components.greedy_decoder import GreedyDecoderCell
+from components.beam_search_decoder import BeamSearchDecoderCell
+from components.beam_search_optimization import BSOCell, bso_cross_entropy, bso_loss
 from components.dynamic_rnn import dynamic_rnn
 
 
@@ -82,8 +82,7 @@ class Decoder(object):
                 if self._config.beam_search_optimization:
                     mistake_function = bso_loss
                     bso_cell = BSOCell(decoder_cell, mistake_function)
-                    bso_inputs = get_inputs(formula, embeddings[:, 1:, :])
-                    bso_outputs, _ = dynamic_rnn(bso_cell, bso_inputs,
+                    bso_outputs, _ = dynamic_rnn(bso_cell, formula,
                             initial_state=bso_cell.initial_state)
                     decoder_output["bso"] = bso_outputs
 

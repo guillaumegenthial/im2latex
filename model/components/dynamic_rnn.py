@@ -29,7 +29,10 @@ def dynamic_rnn(decoder_cell, inputs, initial_state):
         return tf.TensorArray(dtype=d, size=0, dynamic_size=True)
 
     initial_time = tf.constant(0, dtype=tf.int32)
-    n_steps = tf.shape(inputs[0])[1]
+    try:
+        n_steps = tf.shape(inputs[0])[1] # nested case
+    except:
+        n_steps = tf.shape(inputs)[1] # non nested case
 
     initial_outputs_ta = nest.map_structure(create_ta, decoder_cell.output_dtype)
 

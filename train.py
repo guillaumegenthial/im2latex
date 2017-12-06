@@ -1,4 +1,5 @@
 import click
+import time
 
 
 from model.utils.data_generator import DataGenerator

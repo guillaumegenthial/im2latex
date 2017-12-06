@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 
-from beam_search_decoder_cell import gather_helper
+from beam_search_decoder import gather_helper
 
 
 def gather_helper_np(t, indices, batch_size, beam_size, vocab_size):
