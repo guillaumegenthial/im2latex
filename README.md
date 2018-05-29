@@ -6,7 +6,7 @@ Check the [blog post](https://guillaumegenthial.github.io/image-to-latex.html).
 
 ## Install
 
-Install pdflatex (latex to pdf) and ghostsript + [magick](https://www.imagemagick.org/script/install-source.php
+Install pdflatex (latex to pdf) and [ghostscript](https://www.gnu.org/software/ghostscript/) + [magick](https://www.imagemagick.org/script/install-source.php
 ) (pdf to png) on Linux
 
 
