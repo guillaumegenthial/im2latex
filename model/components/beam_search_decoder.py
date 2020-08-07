@@ -4,8 +4,8 @@ from tensorflow.python.util import nest
 from tensorflow.contrib.rnn import RNNCell
 
 
-from dynamic_decode import transpose_batch_time
-from greedy_decoder import DecoderOutput
+from .dynamic_decode import transpose_batch_time
+from .greedy_decoder import DecoderOutput
 
 
 class BeamSearchDecoderCellState(collections.namedtuple(
