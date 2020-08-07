@@ -5,13 +5,13 @@ import tensorflow.contrib.layers as layers
 from tensorflow.contrib.rnn import GRUCell, LSTMCell
 
 
-from components.dynamic_decode import dynamic_decode
-from components.attention_mechanism import AttentionMechanism
-from components.attention_cell import AttentionCell
-from components.greedy_decoder import GreedyDecoderCell
-from components.beam_search_decoder import BeamSearchDecoderCell
-from components.beam_search_optimization import BSOCell, bso_cross_entropy, bso_loss
-from components.dynamic_rnn import dynamic_rnn
+from .components.dynamic_decode import dynamic_decode
+from .components.attention_mechanism import AttentionMechanism
+from .components.attention_cell import AttentionCell
+from .components.greedy_decoder import GreedyDecoderCell
+from .components.beam_search_decoder import BeamSearchDecoderCell
+from .components.beam_search_optimization import BSOCell, bso_cross_entropy, bso_loss
+from .components.dynamic_rnn import dynamic_rnn
 
 
 class Decoder(object):
